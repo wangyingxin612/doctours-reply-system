@@ -6,9 +6,15 @@ import { fileURLToPath } from "node:url";
 
 const PROMPTS_DIR = dirname(fileURLToPath(import.meta.url));
 
-export type PromptName = "router.md" | "responder-frame.md" | "repair.md" | "user-message.txt";
+export type PromptName = "router.md" | "responder-frame.md" | "repair.md" | "call-history.md" | "user-message.txt";
 
-export const PROMPT_NAMES: PromptName[] = ["router.md", "responder-frame.md", "repair.md", "user-message.txt"];
+export const PROMPT_NAMES: PromptName[] = [
+  "router.md",
+  "responder-frame.md",
+  "repair.md",
+  "call-history.md",
+  "user-message.txt",
+];
 
 const cache = new Map<PromptName, string>();
 
