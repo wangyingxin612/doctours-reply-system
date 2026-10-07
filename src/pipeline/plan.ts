@@ -22,6 +22,8 @@ export interface Directives {
   pause: boolean;
   /** The patient's wording matches more than one of these packages. The reply asks which one. */
   clarifyPackage: string[] | null;
+  /** The patient asked who or what they are talking to. The core rules have the answer: name and role. */
+  identityQuestion: boolean;
 }
 
 /** One entry per place where code chose between rules. Written to the trace. */
@@ -570,6 +572,7 @@ export function buildPlan(input: PlanInput): Plan {
       quoteDepositWithPrice: context.pipelineStatus === "PRE_CLINICAL_SENT",
       pause: pausing,
       clarifyPackage: selection.ambiguousPackages,
+      identityQuestion: router.intents.includes("identity"),
     },
     precedence,
     policyAmounts: [...new Set(loaded.flatMap((skill) => skill.policyAmounts))],

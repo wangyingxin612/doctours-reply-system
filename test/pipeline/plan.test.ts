@@ -274,6 +274,16 @@ describe("planner: other stages", () => {
   });
 });
 
+describe("planner: identity questions", () => {
+  it("tells the responder when the patient asked who or what they are talking to", () => {
+    const asked = plan(routed({ primaryIntent: "identity", intents: ["identity"], skills: [] }), "Is this a real person?").plan;
+    expect(asked.directives.identityQuestion).toBe(true);
+    expect(asked.selected).toEqual([]);
+
+    expect(plan(routed()).plan.directives.identityQuestion).toBe(false);
+  });
+});
+
 describe("planner: directives", () => {
   it("asks for the deposit to be quoted with the price at the decision stage only", () => {
     const context = buildPacketContext();
