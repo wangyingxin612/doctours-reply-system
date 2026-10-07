@@ -1,11 +1,16 @@
 // The eval set and its checker, checked without a model. A bad pattern or a misspelt reason code
 // would otherwise only show up after a paid run.
 
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkCase, type EvalCase, type Produced } from "../../eval/assert";
-import { loadCases } from "../../eval/lib";
+import { loadCases, recheckRun, type LoadedCase } from "../../eval/lib";
 import { HANDOFF_SENTENCE, REASON_CODES } from "../../src/policy/escalation";
 import type { Reply } from "../../src/schema/reply";
+import type { Trace } from "../../src/trace/types";
+import { writeTrace } from "../../src/trace/write";
 
 describe("eval cases", () => {
   const cases = loadCases();
@@ -146,5 +151,67 @@ describe("checkCase", () => {
     expect(failuresOf({ escalate: false }, reply({ escalationReason: "left over" }))).toEqual([
       "escalationReason is set on a reply that does not escalate",
     ]);
+  });
+});
+
+describe("checking a past run again", () => {
+  const answer: Reply = {
+    response: "Gold includes four nights at the hotel.",
+    escalate: false,
+    escalationReason: null,
+    templateId: null,
+    intent: "answer a package question",
+    shouldFollowUp: false,
+    followUpTiming: null,
+    attachmentUrls: null,
+    highEngagement: false,
+    workingMemoryUpdates: null,
+  };
+
+  function stored(index: number, messageId: string, reply: Reply): Trace {
+    return {
+      runId: "past",
+      index,
+      messageId,
+      policyVersion: "v1",
+      models: { router: "r", responder: "m", responderEffort: "low" },
+      message: { redactedText: "", redactions: [] },
+      guard: { hits: [] },
+      router: null,
+      primaryIntent: "clinic_packages",
+      skillsLoaded: [],
+      toolCalls: [],
+      events: [],
+      directives: null,
+      precedence: [],
+      validation: [],
+      repairAttempts: 0,
+      decision: { escalate: false, reasonCode: null, secondaryReasonCodes: [], decidedBy: "none", category: null },
+      failure: null,
+      coverage: "all",
+      modelCalls: [],
+      latencyMs: 10,
+      reply,
+    };
+  }
+
+  const gold: LoadedCase = { id: "gold", source: "custom", split: "dev", tags: ["packages"], text: "What does Gold include?", expect: { escalate: false, mustMatch: ["four nights"] } };
+  const silver: LoadedCase = { ...gold, id: "silver", text: "What does Silver include?" };
+
+  it("checks stored replies against the cases as they are now, with no model, and groups repeats by case", () => {
+    const dir = mkdtempSync(join(tmpdir(), "recheck-"));
+    try {
+      writeTrace(dir, stored(0, "gold#1", answer));
+      writeTrace(dir, stored(1, "gold#2", { ...answer, response: "Gold includes the hotel." }));
+
+      const past = recheckRun(dir, [gold, silver]);
+
+      expect(past.repeat).toBe(2);
+      expect(past.traces).toHaveLength(2);
+      expect(past.cases.map(({ testCase, runs }) => [testCase.id, runs.map((run) => run.passed)])).toEqual([["gold", [true, false]]]);
+      expect(() => recheckRun(dir, [silver])).toThrow(/No trace/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

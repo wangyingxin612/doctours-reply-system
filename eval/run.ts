@@ -1,6 +1,7 @@
 // npm run eval -- [--only id,id] [--tag tag] [--split dev|holdout] [--repeat n] [--concurrency n] [--run-id id]
 // Runs the eval cases through the real pipeline with real model calls, and checks each reply.
 // With --repeat, each case runs n times, and the report shows how often `escalate` flips between runs.
+// With --recheck <runDir>, no model is called: the stored replies of that past run are checked again.
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -11,7 +12,7 @@ import { createAnswerStage, currentPolicyVersion } from "../src/pipeline/answer"
 import { DEFAULT_CONCURRENCY, respondToMessages } from "../src/pipeline/batch";
 import { FatalRunError } from "../src/pipeline/errors";
 import { checkCase } from "./assert";
-import { defaultRunId, report, selectCases, type CaseRuns } from "./lib";
+import { defaultRunId, recheckRun, report, selectCases, type CaseRuns } from "./lib";
 
 async function main(): Promise<void> {
   const { values } = parseArgs({
@@ -22,8 +23,16 @@ async function main(): Promise<void> {
       repeat: { type: "string" },
       concurrency: { type: "string" },
       "run-id": { type: "string" },
+      recheck: { type: "string" },
     },
   });
+
+  if (values.recheck) {
+    const past = recheckRun(values.recheck, selectCases(values));
+    console.log(`Checking the stored replies of ${values.recheck} again. No model is called.\n`);
+    if (!report(past.cases, past.traces, past.repeat)) process.exitCode = 1;
+    return;
+  }
 
   if (existsSync(".env")) process.loadEnvFile(".env");
 

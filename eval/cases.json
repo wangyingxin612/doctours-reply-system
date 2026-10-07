@@ -651,10 +651,11 @@
       "insurance"
     ],
     "text": "Does Medicaid pay for a hair transplant?",
+    "note": "The first pattern checks the fact that Medicaid cannot pay, in any usual wording. It used to require the word 'insurance', and failed a correct reply that said 'insurers'.",
     "expect": {
       "escalate": false,
       "mustMatch": [
-        "insurance",
+        "can(no|')t (use|be used)|cash-pay|do(n't| not) (bill|accept|take)|(is|are)(n't| not) (covered|accepted)|does(n't| not) (pay|cover)",
         "financing|layaway"
       ],
       "mustNotMatch": [

@@ -4,9 +4,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { costOf } from "../config/pricing";
-import { percentile, retriesOf } from "../src/report/aggregate";
+import { loadRun, percentile, retriesOf } from "../src/report/aggregate";
 import type { ModelCallTrace, Trace } from "../src/trace/types";
-import { caseSchema, type CaseResult, type EvalCase } from "./assert";
+import { caseSchema, checkCase, type CaseResult, type EvalCase } from "./assert";
 
 const EVAL_DIR = import.meta.dirname;
 
@@ -141,6 +141,30 @@ export function report(cases: readonly CaseRuns[], traces: readonly RunRecord[],
   const passedCases = cases.filter(({ runs }) => runs.every((run) => run.passed)).length;
   console.log(`\n${passedCases}/${cases.length} cases passed${repeat > 1 ? " on every run" : ""}.`);
   return passedCases === cases.length;
+}
+
+/**
+ * Checks the replies a past run already produced against the cases as they are now. No model is
+ * called, so a changed assertion can be tried on every stored run for free.
+ */
+export function recheckRun(runDir: string, cases: readonly LoadedCase[]): { cases: CaseRuns[]; traces: Trace[]; repeat: number } {
+  const byCase = new Map<string, Trace[]>();
+  for (const trace of loadRun(runDir)) {
+    // A repeated run names its messages "<case id>#<round>".
+    const id = trace.messageId.replace(/#\d+$/, "");
+    byCase.set(id, [...(byCase.get(id) ?? []), trace]);
+  }
+
+  const found = cases.filter((testCase) => byCase.has(testCase.id));
+  if (found.length === 0) throw new Error(`No trace in ${runDir} belongs to a selected eval case.`);
+  return {
+    cases: found.map((testCase) => ({
+      testCase,
+      runs: byCase.get(testCase.id)!.map((trace) => checkCase(testCase, trace.reply, trace)),
+    })),
+    traces: found.flatMap((testCase) => byCase.get(testCase.id)!),
+    repeat: Math.max(...found.map((testCase) => byCase.get(testCase.id)!.length)),
+  };
 }
 
 /** Applies the --only, --tag and --split filters. */
