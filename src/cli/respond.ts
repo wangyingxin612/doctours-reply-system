@@ -7,9 +7,9 @@ import { join } from "node:path";
 import { parseArgs } from "node:util";
 import { loadModelConfig } from "../../config/models";
 import { buildPacketContext } from "../context/fixture";
+import { createAnswerStage, currentPolicyVersion } from "../pipeline/answer";
 import { DEFAULT_CONCURRENCY, respondToMessages } from "../pipeline/batch";
 import { FatalRunError } from "../pipeline/errors";
-import { computePolicyVersion } from "../policy/version";
 
 const USAGE = `Usage: npm run respond -- [--in <file>] [--out <file>] [options]
 
@@ -73,15 +73,17 @@ async function main(): Promise<void> {
   const runId = values["run-id"] ?? defaultRunId();
   const traceDir = values["no-trace"] ? null : join(values["trace-dir"] ?? "traces", runId);
   const items = readInput(values.in);
+  const context = buildPacketContext();
 
   const { replies, traces } = await respondToMessages(items, {
     runId,
     concurrency,
     traceDir,
     deps: {
-      context: buildPacketContext(),
+      context,
       config: loadModelConfig(),
-      policyVersion: computePolicyVersion(),
+      policyVersion: currentPolicyVersion(context.vertical),
+      answer: createAnswerStage(),
     },
   });
 
