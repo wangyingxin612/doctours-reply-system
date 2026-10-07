@@ -42,8 +42,6 @@ entities:
 
 needsCallHistory: true when answering needs what was said on a phone call with us, for example when the patient refers to something discussed on a call. Otherwise false.
 
-rationale: one sentence on why you chose the primary intent and any actions.
-
 confidence: "low" when the message is hard to read or could reasonably be classified another way. Otherwise "high".
 
 # Skills

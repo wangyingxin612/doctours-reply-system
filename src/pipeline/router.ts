@@ -80,7 +80,6 @@ function routerSchema(skillNames: readonly string[]) {
       linksRequested: z.array(z.enum(LINK_KINDS)),
     }),
     needsCallHistory: z.boolean(),
-    rationale: z.string(),
     confidence: z.enum(["high", "low"]),
   });
 }
