@@ -24,6 +24,7 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     humanRequested: false,
     requestedActions: [],
     selfServe: [],
+    needsCallHistory: false,
     rationale: "test",
     confidence: "high",
     ...rest,
@@ -31,6 +32,7 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
       clinics: [],
       packages: [],
       clinicLean: null,
+      packageLean: null,
       statedTiming: null,
       statedName: null,
       linksRequested: [],
@@ -124,12 +126,42 @@ describe("planner: side effects", () => {
     expect(saves[0]?.output).toMatchObject({ updated: true });
   });
 
-  it("saves nothing when the patient is torn or names two clinics", () => {
-    const torn = plan(routed({ entities: { clinics: ["Heva Clinic", "Dr. Hakan Clinic"], clinicLean: "torn" } }));
-    const two = plan(routed({ entities: { clinics: ["Heva Clinic", "Dr. Hakan Clinic"], clinicLean: "selected" } }));
+  it("saves a patient who is torn as soft interest, never as a selection", () => {
+    const { ledger } = plan(routed({ entities: { clinics: ["Heva Clinic", "Dr. Hakan Clinic"], clinicLean: "torn" } }));
+    const saves = ledger.calls.filter((call) => call.kind === "write");
 
-    expect(torn.ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
-    expect(two.ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
+    expect(saves.map((call) => call.input)).toEqual([
+      { clinicSelection: { softClinicInterestIds: [HEVA_CLINIC_ID, HAKAN_CLINIC_ID] }, userId: buildPacketContext().userId },
+    ]);
+  });
+
+  it("saves nothing when a lean names two clinics, because it is not a lean toward one", () => {
+    const { ledger } = plan(routed({ entities: { clinics: ["Heva Clinic", "Dr. Hakan Clinic"], clinicLean: "selected" } }));
+    expect(ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
+  });
+
+  it("saves a chosen package together with its clinic", () => {
+    const { ledger } = plan(
+      routed({ entities: { clinics: ["Heva Clinic"], clinicLean: "selected", packages: ["Gold"], packageLean: "selected" } }),
+    );
+    const saves = ledger.calls.filter((call) => call.name === "updateUserClinicPreferencesTool");
+
+    expect(saves).toHaveLength(1);
+    expect(saves[0]?.input).toMatchObject({
+      clinicSelection: { selectedClinicId: HEVA_CLINIC_ID, selectedPackageId: "44444444-4444-4444-8444-444444444442" },
+    });
+  });
+
+  it("saves stated timing with its strength, and a stated name", () => {
+    const { ledger } = plan(
+      routed({ entities: { statedTiming: { text: "probably October", strength: "medium" }, statedName: "Sam Rivera" } }),
+    );
+    const saves = ledger.calls.filter((call) => call.kind === "write").map((call) => [call.name, call.input]);
+
+    expect(saves).toEqual([
+      ["updateUserClinicPreferencesTool", { tentativeProcedureDates: { text: "probably October", strength: "medium" }, userId: buildPacketContext().userId }],
+      ["updateUserTool", { firstName: "Sam", lastName: "Rivera", userId: buildPacketContext().userId }],
+    ]);
   });
 });
 
@@ -258,5 +290,163 @@ describe("collection anchor", () => {
     expect(
       computeAnchor(lead({ ...known, procedure: { ...base.procedure, area: "beard" } }), { pausing: false }).anchor,
     ).toBe("none");
+  });
+});
+
+describe("planner: paying has one link, chosen by how decided the patient is", () => {
+  const paymentUrl = (packageId: string) => `https://www.doctours.com/payment/${packageId}`;
+  const GOLD = "44444444-4444-4444-8444-444444444442";
+  const SAPPHIRE = "55555555-5555-4555-8555-555555555551";
+
+  it("sends the payment link when clinic and package are both decided", () => {
+    const { plan: built } = plan(
+      routed({ entities: { clinics: ["Heva Clinic"], clinicLean: "selected", packages: ["Gold"], packageLean: "selected" } }),
+    );
+
+    expect(built.directives.links.include).toEqual([paymentUrl(GOLD)]);
+    expect(built.selected.map((skill) => skill.name)).toContain("payment-deposit");
+    expect(built.precedence[0]?.decision).toContain("payment link, not the assessment");
+  });
+
+  it("finds the clinic from a package name that only one recommended clinic has", () => {
+    const { plan: built, ledger } = plan(routed({ entities: { packages: ["Sapphire"], packageLean: "selected" } }), "I'll take Sapphire");
+
+    expect(built.directives.links.include).toEqual([paymentUrl(SAPPHIRE)]);
+    expect(ledger.calls.find((call) => call.kind === "write")?.input).toMatchObject({
+      clinicSelection: { selectedClinicId: HAKAN_CLINIC_ID, selectedPackageId: SAPPHIRE },
+    });
+  });
+
+  it("sends the checkout link when the clinic is decided, the package is not, and the patient asks to pay", () => {
+    const { plan: built } = plan(
+      routed({ entities: { clinics: ["Heva Clinic"], clinicLean: "selected", linksRequested: ["payment"] } }),
+    );
+    expect(built.directives.links.include).toEqual(["https://www.doctours.com/clinic/heva/checkout"]);
+  });
+
+  it("points at the assessment when the patient only asks how paying works, even with a clinic in mind", () => {
+    const { plan: built } = plan(
+      routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"], entities: { clinics: ["Heva Clinic"], clinicLean: "selected" } }),
+    );
+    expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
+  });
+
+  it("points at the assessment when the patient asks to pay but has decided nothing", () => {
+    const { plan: built } = plan(routed({ entities: { linksRequested: ["payment"] } }));
+    expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
+  });
+
+  it("asks which package when the wording fits more than one, and sends no payment link", () => {
+    const { plan: built, ledger } = plan(
+      routed({ entities: { clinics: ["Heva Clinic"], clinicLean: "selected", packages: ["Silver", "Gold"], packageLean: "selected" } }),
+    );
+
+    expect(built.directives.clarifyPackage).toEqual(["Silver", "Gold"]);
+    expect(built.directives.links.include.some((url) => url.includes("/payment/"))).toBe(false);
+    expect(ledger.calls.find((call) => call.kind === "write")?.input).not.toHaveProperty("clinicSelection.selectedPackageId");
+  });
+
+  it("does not treat asking about a package as choosing it", () => {
+    const { plan: built, ledger } = plan(
+      routed({ skills: ["clinic-packages"], entities: { clinics: ["Heva Clinic"], packages: ["Gold"] } }),
+      "what does Gold include?",
+    );
+
+    expect(built.directives.links.include).toEqual([]);
+    expect(ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
+  });
+
+  it("never sends a payment link and a checkout link together", () => {
+    const { plan: built } = plan(
+      routed({
+        selfServe: ["pay_deposit"],
+        entities: { clinics: ["Heva Clinic"], clinicLean: "selected", packages: ["Gold"], packageLean: "selected", linksRequested: ["payment"] },
+      }),
+    );
+    expect(built.directives.links.include).toEqual([paymentUrl(GOLD)]);
+  });
+});
+
+describe("planner: other links", () => {
+  it("sends the Doctours clinic page on a first ask for a clinic's website", () => {
+    const { plan: built } = plan(routed({ entities: { clinics: ["Heva Clinic"], linksRequested: ["clinic_page"] } }));
+
+    expect(built.directives.links.include).toEqual(["https://www.doctours.com/clinic/heva"]);
+    expect(built.selected.map((skill) => skill.name)).toContain("clinic-website-contact");
+  });
+
+  it("sends the clinic's own site only on a repeat ask, after the Doctours page was sent", () => {
+    const context = buildPacketContext();
+    const asked = { ...context, text: { ...context.text, chatList: `${context.text.chatList}\n[Sep 27, 9:00 AM] Alex: You can see Heva on our clinic page using the link below.\nhttps://www.doctours.com/clinic/heva` } };
+    const { plan: built } = plan(routed({ entities: { clinics: ["Heva Clinic"], linksRequested: ["clinic_page"] } }), "no, their own site", asked);
+
+    // In the packet's data the clinic's own url happens to be the same address.
+    expect(built.directives.links.include).toEqual(["https://www.doctours.com/clinic/heva"]);
+    expect(built.precedence[0]?.decision).toContain("Repeat ask");
+    expect(built.precedence[0]?.beats).toEqual(["no_repeated_links"]);
+  });
+
+  it("offers the upload link only when photos are missing", () => {
+    const context = buildPacketContext();
+    const onFile = plan(routed({ selfServe: ["upload_photos"] }));
+    const missing = plan(routed({ selfServe: ["upload_photos"] }), "how do I send photos?", { ...context, images: { hasImages: false, count: 0 } });
+
+    expect(onFile.plan.directives.links.include).toEqual([]);
+    expect(missing.plan.directives.links.include).toEqual(["https://www.doctours.com/image-upload"]);
+  });
+
+  it("leaves the consultation link out when the question is about a past call", () => {
+    const { plan: built } = plan(routed({ primaryIntent: "consultation", skills: ["consultation"], needsCallHistory: true }));
+    expect(built.directives.links.include).toEqual([]);
+  });
+
+  it("does not save a time wanted for a consultation call as procedure timing", () => {
+    const { ledger } = plan(
+      routed({
+        primaryIntent: "consultation",
+        requestedActions: [{ type: "reschedule_consultation", evidence: "move my call to next week" }],
+        entities: { statedTiming: { text: "next week", strength: "medium" } },
+      }),
+    );
+    expect(ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
+  });
+
+  it("offers the booking link when a patient asks to move a consultation that is not on file", () => {
+    const { plan: built } = plan(
+      routed({ primaryIntent: "consultation", requestedActions: [{ type: "reschedule_consultation", evidence: "move my call" }] }),
+    );
+    expect(built.directives.links.include).toEqual([CONSULTATION_URL]);
+  });
+});
+
+describe("planner: pause", () => {
+  it("adds no link, no anchor and no funnel step on a pause", () => {
+    const { plan: built } = plan(
+      routed({ requestType: "pause", primaryIntent: "pause_followup", selfServe: ["pay_deposit", "book_consultation"] }),
+    );
+
+    expect(built.directives).toMatchObject({ pause: true, anchor: "none", links: { include: [] } });
+    expect(built.precedence.map((entry) => entry.rule)).toContain("time_bound_pause");
+  });
+
+  it("still sends a link the patient explicitly asks for while pausing", () => {
+    const { plan: built } = plan(routed({ requestType: "pause", entities: { linksRequested: ["assessment"] } }));
+    expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
+  });
+});
+
+describe("planner: actions a rule handles", () => {
+  it("loads the skill that handles an action, even if the router did not list it", () => {
+    const { plan: built } = plan(routed({ requestedActions: [{ type: "request_discount", evidence: "any discount?" }] }));
+    expect(built.selected.map((skill) => skill.name)).toEqual(["pricing-promos"]);
+  });
+
+  it("records a revision request as an event, so the promise the reply makes is traceable", () => {
+    const { plan: built } = plan(
+      routed({ requestedActions: [{ type: "revise_assessment", evidence: "can the hairline be a bit lower" }] }),
+    );
+
+    expect(built.events).toEqual([{ type: "revision_request", detail: { requested: "can the hairline be a bit lower" } }]);
+    expect(built.selected.map((skill) => skill.name)).toContain("assessment");
   });
 });

@@ -16,6 +16,7 @@ import {
   type WorkingMemoryUpdates,
 } from "../schema/reply";
 import { renderSkillBody } from "../skills/loader";
+import type { ExtraFact } from "../subtasks/callHistory";
 import type { TurnLedger } from "../tools/ledger";
 import { TOOL_REGISTRY, type ToolDefinition } from "../tools/registry";
 import type { ModelStage } from "../trace/types";
@@ -63,16 +64,20 @@ export interface ResponderInput {
   redactedTokens: readonly string[];
 }
 
-function factsBlock(ledger: TurnLedger): string {
-  const calls = ledger.calls.filter((call) => call.source !== "memory");
+function factsBlock(ledger: TurnLedger, extraFacts: readonly ExtraFact[]): string {
+  // A subtask's raw tool output stays out of the prompt. Its prepared fact goes in instead.
+  const calls = ledger.calls.filter((call) => call.source !== "memory" && call.source !== "subtask");
   const lines = ["# FACTS FOR THIS MESSAGE", ""];
-  if (calls.length === 0) return [...lines, "No tool calls were made for this message."].join("\n");
+  if (calls.length === 0 && extraFacts.length === 0) {
+    return [...lines, "No tool calls were made for this message."].join("\n");
+  }
 
   lines.push("Results of tool calls made for this message.");
   for (const call of calls) {
     const saved = call.kind === "write" ? " (saved this turn)" : "";
     lines.push("", `## ${call.name}(${JSON.stringify(call.input)})${saved}`, JSON.stringify(call.output));
   }
+  for (const fact of extraFacts) lines.push("", `## ${fact.title}`, fact.body);
   return lines.join("\n");
 }
 
@@ -103,7 +108,7 @@ function systemBlocks(input: ResponderInput): SystemBlock[] {
     { text: rules, cache: true },
     { text: skills, cache: plan.selected.length > 0 },
     { text: patientContextBlock(context), cache: true },
-    { text: `${factsBlock(ledger)}\n\n${directivesBlock(plan)}` },
+    { text: `${factsBlock(ledger, plan.extraFacts)}\n\n${directivesBlock(plan)}` },
   ];
 }
 

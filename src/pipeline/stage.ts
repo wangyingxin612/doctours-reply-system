@@ -2,6 +2,7 @@
 // and which one. The responder gets one directive, for example anchor: "none".
 
 import type { PatientContext } from "../context/types";
+import type { Reply } from "../schema/reply";
 
 export type Anchor = "none" | "area" | "name" | "photos";
 
@@ -44,4 +45,21 @@ export function computeAnchor(context: PatientContext, options: { pausing: boole
   const next = items.find((entry) => !entry.known && !entry.asked && entry.allowed);
   if (next) return { anchor: next.item, reason: `The ${next.item} is unknown and has not been asked yet.` };
   return { anchor: "none", reason: "Every collection item is known, already asked, or not asked at this stage." };
+}
+
+/**
+ * Counts the ask. Code owns the collection counters, because code decided the anchor:
+ * the model is never asked to count what it has asked.
+ */
+export function recordAnchorAsked(reply: Reply, anchor: Anchor, context: PatientContext): Reply {
+  if (anchor === "none") return reply;
+  const asks = context.workingMemory.collectionState ?? {};
+  const counter = { area: "areaAskCount", name: "nameAskCount", photos: "photoAskCount" } as const;
+  return {
+    ...reply,
+    workingMemoryUpdates: {
+      ...reply.workingMemoryUpdates,
+      collectionState: { ...asks, lastAskedItem: anchor, [counter[anchor]]: (asks[counter[anchor]] ?? 0) + 1 },
+    },
+  };
 }

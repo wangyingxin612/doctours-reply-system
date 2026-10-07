@@ -6,10 +6,12 @@ import { buildEscalationReply } from "../policy/escalation";
 import { computePolicyVersion } from "../policy/version";
 import { loadPrompt, PROMPT_NAMES } from "../prompts";
 import { loadSkills } from "../skills/loader";
+import { readCallHistory } from "../subtasks/callHistory";
 import { buildPlan } from "./plan";
 import { runResponder } from "./responder";
 import { runRouter } from "./router";
 import type { AnswerStage } from "./run";
+import { recordAnchorAsked } from "./stage";
 
 /** `deps.model` swaps in a mock model for tests. In production it is left empty. */
 export function createAnswerStage(deps: LlmDeps = {}): AnswerStage {
@@ -35,6 +37,13 @@ export function createAnswerStage(deps: LlmDeps = {}): AnswerStage {
     record.skillsLoaded = [plan.core, ...(plan.stage ? [plan.stage] : []), ...plan.selected].map((skill) => skill.name);
     record.directives = plan.directives;
     record.precedence = plan.precedence;
+    record.events.push(...plan.events);
+
+    if (routed.output.needsCallHistory) {
+      const history = await readCallHistory({ question: message.text, context, ledger, config }, deps);
+      plan.extraFacts.push(history.fact);
+      if (history.call) record.modelCalls.push(history.call);
+    }
 
     const reply = await runResponder(
       {
@@ -48,7 +57,7 @@ export function createAnswerStage(deps: LlmDeps = {}): AnswerStage {
       },
       deps,
     );
-    return { reply, decision };
+    return { reply: recordAnchorAsked(reply, plan.directives.anchor, context), decision };
   };
 }
 
