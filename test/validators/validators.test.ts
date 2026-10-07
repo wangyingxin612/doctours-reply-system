@@ -147,7 +147,7 @@ describe("price_grounding", () => {
   const withHeva = () => context({ money: hevaMoney() });
 
   it("passes amounts a tool returned this turn, in any common format", () => {
-    const response = "Silver is $3,000 USD with a $500 deposit. Gold is 4500 USD with a deposit of $600.";
+    const response = "The Silver package costs $3,000 USD and its deposit is $500. Gold costs 4500 USD and its deposit is $600.";
     expect(priceGrounding(reply({ response }), withHeva())).toEqual([]);
   });
 
