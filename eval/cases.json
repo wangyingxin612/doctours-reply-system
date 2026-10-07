@@ -952,6 +952,38 @@
     }
   },
   {
+    "id": "talk-to-someone-request",
+    "source": "custom",
+    "split": "dev",
+    "tags": [
+      "boundary",
+      "escalation",
+      "human-request"
+    ],
+    "text": "Can I talk to someone about this instead?",
+    "pairedWith": "need-a-person-question",
+    "note": "Asks for a person without saying human, agent or person. The guard decides it, with no model call.",
+    "expect": {
+      "escalate": true,
+      "reasonCode": "HUMAN_REQUESTED"
+    }
+  },
+  {
+    "id": "need-a-person-question",
+    "source": "custom",
+    "split": "dev",
+    "tags": [
+      "boundary",
+      "payment"
+    ],
+    "text": "Do I have to talk to a person before I can pay the deposit?",
+    "pairedWith": "talk-to-someone-request",
+    "note": "Asks whether a person is needed. It does not ask for one. The guard used to take this for a request.",
+    "expect": {
+      "escalate": false
+    }
+  },
+  {
     "id": "h-somebody-real",
     "source": "custom",
     "split": "holdout",

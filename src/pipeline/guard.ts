@@ -75,7 +75,7 @@ function redact(text: string): { redactedText: string; redactions: Redaction[] }
 
 // --- Explicit requests for a human -------------------------------------------------------------
 
-const HUMAN_STRICT = String.raw`(?:human(?:\s+being)?|agent|representative|rep|operator|manager|supervisor|(?:real|live|actual)\s+person)`;
+const HUMAN_STRICT = String.raw`(?:human(?:\s+being)?|agent|representative|rep|operator|manager|supervisor|(?:real|live|actual)\s+person|customer\s+(?:service|support|care))`;
 const QUALIFIER = String.raw`(?:(?:real|live|actual|human|customer\s+service|support)\s+){0,2}`;
 const ARTICLE = String.raw`(?:(?:a|an|the|some|another|any|your)\s+)?`;
 const TARGET = String.raw`${ARTICLE}${QUALIFIER}(?:${HUMAN_STRICT}|person)\b`;
@@ -87,10 +87,34 @@ const LET_ME = String.raw`\blet\s+me\s+`;
 const MUST = String.raw`\bi\s+(?:have|need|got)\s+to\s+`;
 const CONTACT = String.raw`(?:talk|speak|chat|get\s+in\s+touch|be\s+connected|be\s+transferred|connect)\s+(?:to|with)\s+`;
 
+// "Someone" means one of us only when nothing narrows it to somebody else. "Talk to someone about
+// this" asks for a person here. "Talk to someone who had the surgery", "someone at the clinic"
+// and "someone in my family first" do not, so what follows the word has to be on a short list.
+const SOMEONE = String.raw`(?:someone|somebody|anyone|anybody)(?:\s+else)?\b`;
+const SOMEONE_OF_OURS = String.raw`${SOMEONE}(?=\s*(?:$|[.!?,;]|please\b|now\b|right\s+now\b|asap\b|instead\b|directly\b|about\b|regarding\b|on\s+your\s+(?:team|side|end)\b|from\s+(?:your\s+(?:team|side|company|office)|doctours)\b|at\s+doctours\b|there\b|here\b))`;
+// What may follow "a rep" or "an agent" in a request for one: the end of the clause, or a word about talking or helping.
+const ENDS_THE_ASK = String.raw`(?=\s*(?:$|[.!?,;]|please\b|now\b|right\s+now\b|asap\b|here\b|instead\b|on\s+(?:this|that|it)\b|to\s+(?:talk|speak|chat|help)\b|on\s+(?:the\s+)?(?:phone|line)\b))`;
+
 const HUMAN_REQUEST_RULES: Array<{ rule: string; pattern: RegExp }> = [
   {
     rule: "asks_to_talk_to_a_human",
     pattern: new RegExp(`(?:${WANT}|${MAY_I}|${LET_ME}|${MUST})${CONTACT}${TARGET}`, "i"),
+  },
+  {
+    rule: "asks_to_talk_to_someone",
+    pattern: new RegExp(`(?:${WANT}|${MAY_I}|${LET_ME}|${MUST})${CONTACT}${SOMEONE_OF_OURS}`, "i"),
+  },
+  {
+    // "Is there someone I can talk to?" A clinic, or a person who had the surgery, is somebody else.
+    rule: "asks_whether_someone_can_talk",
+    pattern: new RegExp(
+      String.raw`\bis\s+there\s+(?:${SOMEONE}|${TARGET})\s+(?:(?:that|who|whom)\s+)?i\s+(?:can|could|may|might)\s+(?:talk|speak|chat)\s+(?:to|with)\b(?!\s+(?:who|that)\b)(?!\s+(?:at|from|in)\s+(?:the|that|this|their|a|my)\b)`,
+      "i",
+    ),
+  },
+  {
+    rule: "asks_to_get_a_human",
+    pattern: new RegExp(`${MAY_I}(?:get|have|see)\\s+${TARGET_STRICT}${ENDS_THE_ASK}`, "i"),
   },
   {
     rule: "asks_to_be_transferred",
@@ -104,7 +128,7 @@ const HUMAN_REQUEST_RULES: Array<{ rule: string; pattern: RegExp }> = [
     // target has to end the clause or be followed by a word about talking or helping.
     rule: "asks_for_a_human",
     pattern: new RegExp(
-      String.raw`(?:\b(?:get|give|send|find)\s+me\s+|\bi(?:'d|\s+would)?\s+(?:want|need|like|demand|require)\s+)${TARGET_STRICT}(?=\s*(?:$|[.!?,;]|please\b|now\b|right\s+now\b|asap\b|here\b|instead\b|to\s+(?:talk|speak|chat|help)\b|on\s+(?:the\s+)?(?:phone|line)\b))`,
+      String.raw`(?:\b(?:get|give|send|find)\s+me\s+|\bi(?:'d|\s+would)?\s+(?:want|need|like|demand|require)\s+)${TARGET_STRICT}${ENDS_THE_ASK}`,
       "i",
     ),
   },
@@ -116,12 +140,15 @@ const HUMAN_REQUEST_RULES: Array<{ rule: string; pattern: RegExp }> = [
 
 // "No need to transfer me to an agent" is not a request. A negation just before the match defers to the router.
 const NEGATION_BEFORE = /\b(?:don'?t|do\s+not|not|no|never|without|rather\s+not|instead\s+of)\b[^.?!]{0,24}$/i;
+// "Do I need to talk to a person before I pay?" asks whether a person is needed. It does not ask for one.
+const ASKS_WHETHER_BEFORE = /\b(?:do|did|does|will|would|should|shall|must)\s+$/i;
 
 function findHumanRequest(text: string): GuardHit | null {
   for (const { rule, pattern } of HUMAN_REQUEST_RULES) {
     const match = pattern.exec(text);
     if (!match) continue;
-    if (NEGATION_BEFORE.test(text.slice(0, match.index))) continue;
+    const before = text.slice(0, match.index);
+    if (NEGATION_BEFORE.test(before) || ASKS_WHETHER_BEFORE.test(before)) continue;
     return { reasonCode: "HUMAN_REQUESTED", rule };
   }
   return null;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { loadCases } from "../../eval/lib";
 import { runGuard } from "../../src/pipeline/guard";
 
 function reasonCodes(text: string): string[] {
@@ -73,6 +74,19 @@ describe("guard: explicit requests for a human", () => {
     "agent please",
     "Human!",
     "Thanks for the info. Can I talk to a human about financing?",
+    // "Someone", where nothing says the someone is anybody but us.
+    "Can I talk to someone about this?",
+    "Let me talk to someone.",
+    "I'd like to speak with somebody about my options",
+    "I need to speak to someone from your team.",
+    "Can I talk to someone else?",
+    "Is there someone I can talk to?",
+    "Is there anyone I can speak with about financing?",
+    "Is there a person I can speak to?",
+    "Can I get a rep on this?",
+    "Could I have a manager please?",
+    "I want customer service.",
+    "Can I talk to customer support?",
   ];
 
   it.each(positives)("escalates: %s", (text) => {
@@ -93,6 +107,26 @@ describe("guard: explicit requests for a human", () => {
     "My agent booked my flights already.",
     "Is there a manager at the clinic?",
     "How human does the new hairline look?",
+    // A question about whether a person is needed is not a request for one.
+    "Do I need to talk to a person before paying?",
+    "Do I have to speak with an agent first?",
+    "Would I need to speak to a representative to book?",
+    "Do I need to talk to someone before I pay?",
+    "Do I need an agent?",
+    // "Someone" who is not one of us, or might not be.
+    "I need to talk to someone in my family first.",
+    "I have to talk to someone first.",
+    "Can I talk to someone who has had this done?",
+    "Can I speak with someone at the clinic?",
+    "Is there someone I can talk to at the clinic?",
+    "Is there anyone I can talk to who had the surgery there?",
+    // A call may be the free consultation, which the patient books alone. The router tells the two apart.
+    "Can someone call me?",
+    "Can I talk to someone on the phone?",
+    "Please have somebody from your team contact me.",
+    "Who will I be talking to on the consultation call?",
+    "Can I have a human do the extraction?",
+    "What are your customer service hours?",
   ];
 
   it.each(negatives)("leaves to the router: %s", (text) => {
@@ -150,5 +184,28 @@ describe("guard: more than one hit", () => {
       "HUMAN_REQUESTED",
       "PAYMENT_ACTION_NO_TOOL",
     ]);
+  });
+});
+
+// The eval cases are the largest set of real wordings there is. The guard decides alone when it
+// fires, so it is held to every one of them: it may not fire on a message that should be answered,
+// and when it fires its code has to be one the case accepts.
+describe("guard: against every eval case", () => {
+  const cases = loadCases();
+  const hitsOf = (text: string) => runGuard(text).hits.map((hit) => hit.reasonCode);
+
+  it("never fires on a message that should be answered", () => {
+    const wrong = cases.filter((testCase) => !testCase.expect.escalate && hitsOf(testCase.text).length > 0).map((testCase) => testCase.id);
+    expect(wrong).toEqual([]);
+    expect(cases.filter((testCase) => !testCase.expect.escalate).length).toBeGreaterThan(40);
+  });
+
+  it("gives a reason code the case accepts whenever it fires", () => {
+    const fired = cases.filter((testCase) => hitsOf(testCase.text).length > 0);
+    for (const testCase of fired) {
+      const accepted = testCase.expect.reasonCode ? [testCase.expect.reasonCode] : testCase.expect.reasonCodeIn;
+      if (accepted) expect(accepted, testCase.id).toContain(hitsOf(testCase.text)[0]);
+    }
+    expect(fired.length).toBeGreaterThanOrEqual(6);
   });
 });
