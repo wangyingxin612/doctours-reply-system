@@ -4,6 +4,7 @@ description: How and where to pay the deposit: paying from the assessment, payme
 loadedBy: router
 tools: [getLatestAssessmentTool, getPatientContextTool, getClinicPackagesTool, getAllClinicsTool]
 prefetch: [getLatestAssessmentTool, getPatientContextTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

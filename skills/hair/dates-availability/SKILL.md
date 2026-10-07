@@ -3,7 +3,8 @@ name: dates-availability
 description: Dates and availability: when the procedure can be booked, which weekdays a package runs, busy months, how a date is requested and confirmed, and the timing the patient has in mind.
 loadedBy: router
 tools: [getClinicPackagesTool, getPatientContextTool]
-prefetch: [getClinicPackagesTool, getPatientContextTool]
+prefetch: [getPatientContextTool]
+prefetchNamed: [getClinicPackagesTool]
 staticLinks: []
 policyAmounts: []
 version: 1

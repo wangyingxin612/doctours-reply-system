@@ -4,6 +4,7 @@ description: A clinic's website or page, and reaching a clinic: asking for a cli
 loadedBy: router
 tools: [getAllClinicsTool, getSavedClinicsTool]
 prefetch: [getAllClinicsTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

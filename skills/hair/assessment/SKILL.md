@@ -4,6 +4,7 @@ description: The patient's assessment: what it contains, the graft estimate, hai
 loadedBy: router
 tools: [getLatestAssessmentTool, getSavedClinicsTool, getPatientContextTool]
 prefetch: [getLatestAssessmentTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

@@ -26,6 +26,12 @@ describe("guard: card redaction", () => {
     ]);
   });
 
+  it("removes last-four digits written without 'in'", () => {
+    const result = runGuard("The site refused my card ending 9034 again.");
+    expect(result.redactedText).toBe("The site refused my card ending [digits removed] again.");
+    expect(result.redactions).toEqual([{ type: "card_last4", token: "9034" }]);
+  });
+
   it("removes masked card numbers", () => {
     expect(runGuard("It was the card **** 5521").redactedText).not.toContain("5521");
     expect(runGuard("xxxx-xxxx-xxxx-9034 is the one").redactedText).not.toContain("9034");

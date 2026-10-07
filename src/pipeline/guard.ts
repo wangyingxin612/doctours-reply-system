@@ -41,7 +41,7 @@ const SENSITIVE_DIGITS: Array<{ type: RedactionType; pattern: RegExp }> = [
     type: "expiry",
     pattern: /\bexp(?:iry|iration|ires|\.)?(?:\s+date)?\s*(?:is|on|[:=])?\s*(\d{1,2}\s*[/-]\s*\d{2,4})\b/gi,
   },
-  { type: "card_last4", pattern: /\b(?:ending|ends|end)\s+(?:in|with)\s+#?(\d{4})\b/gi },
+  { type: "card_last4", pattern: /\b(?:ending|ends|end)(?:\s+(?:in|with))?\s+#?(\d{4})\b/gi },
   {
     type: "card_last4",
     pattern: /\blast\s+(?:four|4)(?:\s+digits)?(?:\s+(?:are|is|of(?:\s+\w+){0,3}))?\s*[:#]?\s*(\d{4})\b/gi,

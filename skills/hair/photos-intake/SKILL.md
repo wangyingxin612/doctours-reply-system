@@ -4,6 +4,7 @@ description: Intake photos: how to upload them and which angles, confirming they
 loadedBy: router
 tools: [getPatientImagesTool]
 prefetch: [getPatientImagesTool]
+prefetchNamed: []
 staticLinks: [https://www.doctours.com/image-upload]
 policyAmounts: []
 version: 1

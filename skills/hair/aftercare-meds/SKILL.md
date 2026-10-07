@@ -4,6 +4,7 @@ description: Medication and aftercare basics: where to get finasteride or minoxi
 loadedBy: router
 tools: []
 prefetch: []
+prefetchNamed: []
 staticLinks: [hims.com, keeps.com]
 policyAmounts: []
 version: 1

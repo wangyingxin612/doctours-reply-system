@@ -14,6 +14,7 @@ const valid = [
   "loadedBy: router",
   "tools: [getClinicPackagesTool, getAllClinicsTool]",
   "prefetch: [getClinicPackagesTool]",
+  "prefetchNamed: []",
   "staticLinks: [https://www.doctours.com/consultation]",
   "policyAmounts: [25]",
   "version: 1",

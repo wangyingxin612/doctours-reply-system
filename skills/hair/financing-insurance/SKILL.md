@@ -4,6 +4,7 @@ description: Paying over time and insurance: financing, instalments, monthly pay
 loadedBy: router
 tools: []
 prefetch: []
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

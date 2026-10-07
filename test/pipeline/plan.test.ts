@@ -224,6 +224,15 @@ describe("planner: the link rule", () => {
     expect(built.precedence[0]).toMatchObject({ rule: "explicit_link_request", beats: ["no_repeated_links"] });
   });
 
+  it("carries one self-serve link, for the step the message is mainly about", () => {
+    const { plan: built } = plan(
+      routed({ primaryIntent: "payment", skills: ["payment-deposit", "consultation"], selfServe: ["pay_deposit", "book_consultation"] }),
+    );
+
+    expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
+    expect(built.precedence.map((entry) => entry.rule)).toContain("one_self_serve_step");
+  });
+
   it("never lists the same link twice", () => {
     const { plan: built } = plan(
       routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"], entities: { linksRequested: ["assessment"] } }),

@@ -4,6 +4,7 @@ description: The free consultation call: its cost and format, who it is with, bo
 loadedBy: router
 tools: [getConsultationRescheduleLinkTool, getFullCallsTool]
 prefetch: [getConsultationRescheduleLinkTool]
+prefetchNamed: []
 staticLinks: [https://www.doctours.com/consultation]
 policyAmounts: []
 version: 1

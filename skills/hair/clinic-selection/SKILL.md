@@ -4,6 +4,7 @@ description: Choosing a clinic: comparing or recommending clinics, a patient tor
 loadedBy: router
 tools: [getSavedClinicsTool, getAllClinicsTool, getClinicPackagesTool, getClinicDoctorsTool, getPatientContextTool]
 prefetch: [getSavedClinicsTool, getPatientContextTool, getClinicPackagesTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

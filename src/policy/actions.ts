@@ -49,7 +49,8 @@ export const ACTION_CATALOG = {
   },
   change_booking: {
     handling: { by: "escalation", reasonCode: "BOOKING_CHANGE_ACTION" },
-    definition: "Asks us to change, cancel or move an existing booking or procedure date.",
+    definition:
+      "Asks us to change, cancel or move a booking or procedure date, or to add or change something on a booking, such as a companion, a hotel stay or a transfer.",
     notThis: "Rescheduling the free consultation call. Asking whether a date can be moved later.",
   },
   match_or_honor_price: {
@@ -108,7 +109,8 @@ export const ACTION_CATALOG = {
   },
   arrange_travel: {
     handling: { by: "skill", skill: "travel" },
-    definition: "Asks us to find or book flights, a hotel or transfers.",
+    definition: "Asks us to find or book flights for them.",
+    notThis: "Adding a person, a hotel night or a transfer to a booking. That is a booking change.",
   },
   request_discount: {
     handling: { by: "skill", skill: "pricing-promos" },

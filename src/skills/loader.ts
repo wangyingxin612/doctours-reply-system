@@ -18,8 +18,10 @@ const frontmatterSchema = z.strictObject({
   status: z.string().optional(),
   /** Tools the responder may call while this skill is loaded. */
   tools: z.array(z.string()),
-  /** Tools code runs up front when this skill is loaded. */
+  /** Tools code runs up front when this skill is loaded. A clinic tool with no clinic named runs for each recommended clinic. */
   prefetch: z.array(z.string()),
+  /** Clinic tools code runs up front only for the clinics the message names. Keeps unasked-for facts out of the prompt. */
+  prefetchNamed: z.array(z.string()),
   staticLinks: z.array(z.string()),
   /** Real policy amounts in the body. The price validator accepts these and no other amount from a skill. */
   policyAmounts: z.array(z.number()),
@@ -28,9 +30,10 @@ const frontmatterSchema = z.strictObject({
   source: z.array(z.string()).min(1),
 });
 
-export interface Skill extends Omit<z.infer<typeof frontmatterSchema>, "tools" | "prefetch"> {
+export interface Skill extends Omit<z.infer<typeof frontmatterSchema>, "tools" | "prefetch" | "prefetchNamed"> {
   tools: ToolName[];
   prefetch: ToolName[];
+  prefetchNamed: ToolName[];
   body: string;
   /** The whole file, for the policy version hash. */
   raw: string;
@@ -79,11 +82,12 @@ export function parseSkill(raw: string, path: string): Skill {
   if (!parsed.success) throw new Error(`${path}: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`);
   const frontmatter = parsed.data;
 
-  for (const name of [...frontmatter.tools, ...frontmatter.prefetch]) {
+  for (const name of [...frontmatter.tools, ...frontmatter.prefetch, ...frontmatter.prefetchNamed]) {
     if (!isToolName(name)) throw new Error(`${path}: unknown tool "${name}"`);
   }
   const tools = frontmatter.tools as ToolName[];
-  const prefetch = frontmatter.prefetch as ToolName[];
+  const prefetch = [...frontmatter.prefetch, ...frontmatter.prefetchNamed] as ToolName[];
+  const prefetchNamed = frontmatter.prefetchNamed as ToolName[];
 
   const notCallable = tools.filter((name) => !isModelCallable(name));
   if (notCallable.length > 0) throw new Error(`${path}: the model may not call ${notCallable.join(", ")}`);
@@ -91,7 +95,14 @@ export function parseSkill(raw: string, path: string): Skill {
   if (writes.length > 0) throw new Error(`${path}: prefetch may only read, not ${writes.join(", ")}`);
   if (frontmatter.loadedBy === "status" && !frontmatter.status) throw new Error(`${path}: a stage skill needs a status`);
 
-  return { ...frontmatter, tools, prefetch, body: lines.slice(close + 1).join("\n").trim(), raw };
+  return {
+    ...frontmatter,
+    tools,
+    prefetch: frontmatter.prefetch as ToolName[],
+    prefetchNamed,
+    body: lines.slice(close + 1).join("\n").trim(),
+    raw,
+  };
 }
 
 export interface SkillSet {

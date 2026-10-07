@@ -4,6 +4,7 @@ description: Content creators and partnerships: collaborations, sponsorships, cr
 loadedBy: router
 tools: []
 prefetch: []
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

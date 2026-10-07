@@ -18,6 +18,14 @@ export const noCardEcho: Validator = (reply, context) => {
   const violations: Violation[] = [];
   const fields = stringsIn(reply, []);
 
+  if (fields.some((field) => /\[(?:card number|digits|code|date) removed\]/i.test(field))) {
+    violations.push({
+      validator: NAME,
+      severity: "block",
+      message: "The reply repeats a marker that stands for removed card data. Leave the card details out entirely.",
+    });
+  }
+
   for (const token of context.redactedTokens) {
     const digits = digitsOf(token);
     if (digits.length < 3) continue;

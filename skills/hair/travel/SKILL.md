@@ -3,7 +3,8 @@ name: travel
 description: Travel and logistics: flights and help finding them, when to arrive and how long to stay, passports, airports, hotels and hotel upgrades, staying at your own hotel, and transfers.
 loadedBy: router
 tools: [getClinicPackagesTool]
-prefetch: [getClinicPackagesTool]
+prefetch: []
+prefetchNamed: [getClinicPackagesTool]
 staticLinks: []
 policyAmounts: []
 version: 1

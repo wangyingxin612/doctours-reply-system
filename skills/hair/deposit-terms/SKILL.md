@@ -4,6 +4,7 @@ description: Deposit terms and changing your mind: refunds and the cancellation 
 loadedBy: router
 tools: []
 prefetch: []
+prefetchNamed: []
 staticLinks: []
 policyAmounts: [25]
 version: 1

@@ -247,6 +247,10 @@ describe("no_card_echo", () => {
     expect(noCardEcho(reply({ response: "That is 18810 grafts." }), context({ redactedTokens: ["1881"] }))).toEqual([]);
   });
 
+  it("blocks a redaction marker copied into the reply", () => {
+    expect(noCardEcho(reply({ response: "I can't see why the card ending in [digits removed] was declined." }), context())).toHaveLength(1);
+  });
+
   it("never repeats the card data in its own message", () => {
     const [violation] = noCardEcho(reply({ response: "Card 1881." }), context({ redactedTokens: ["1881"] }));
     expect(violation?.message).not.toContain("1881");

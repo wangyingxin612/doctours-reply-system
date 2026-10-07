@@ -4,6 +4,7 @@ description: Choosing between packages or add-ons at one clinic: what matters fo
 loadedBy: router
 tools: [getClinicPackagesTool, getPatientContextTool]
 prefetch: [getClinicPackagesTool, getPatientContextTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

@@ -40,8 +40,10 @@ interface SkillSpec {
   status?: string;
   /** Tools the responder may call when this skill is loaded. */
   tools?: string[];
-  /** The subset of tools that code runs up front. */
+  /** Tools code runs up front. A clinic tool with no clinic named runs for each recommended clinic. */
   prefetch?: string[];
+  /** Clinic tools code runs up front only for clinics the message names. */
+  prefetchNamed?: string[];
   staticLinks?: string[];
   policyAmounts?: number[];
   version: number;
@@ -187,17 +189,19 @@ export const SKILL_SPECS: SkillSpec[] = [
     description:
       "Whether a clinic suits a hair type or need: afro, 4C, curly or textured hair, a clinic's speciality and practice type, its doctors, and which procedure areas clinics handle.",
     loadedBy: "router",
-    tools: ["getAllClinicsTool", "getClinicDoctorsTool"],
+    tools: ["getAllClinicsTool", "getClinicDoctorsTool", "getClinicPackagesTool"],
     prefetch: ["getAllClinicsTool"],
+    prefetchNamed: ["getClinicPackagesTool"],
     version: 1,
     source: [
-      "PACKAGE & CLINIC FACTS (hair type is a clinic_flags fact)",
+      "PACKAGE & CLINIC FACTS (hair type is a clinic_flags fact, who performs the incisions)",
       "Clinic flags (workflow prompt)",
       "OPERATIONAL KNOWLEDGE 2 and 4",
       "TOOL USAGE (getAllClinicsTool, getClinicDoctorsTool)",
     ],
     parts: [
       964,
+      981,
       "",
       1518,
       1519,
@@ -419,7 +423,8 @@ export const SKILL_SPECS: SkillSpec[] = [
       "Dates and availability: when the procedure can be booked, which weekdays a package runs, busy months, how a date is requested and confirmed, and the timing the patient has in mind.",
     loadedBy: "router",
     tools: ["getClinicPackagesTool", "getPatientContextTool"],
-    prefetch: ["getClinicPackagesTool", "getPatientContextTool"],
+    prefetch: ["getPatientContextTool"],
+    prefetchNamed: ["getClinicPackagesTool"],
     version: 1,
     source: [
       "OPERATIONAL KNOWLEDGE 5 (scheduling) and 10 (availability)",
@@ -447,7 +452,7 @@ export const SKILL_SPECS: SkillSpec[] = [
       "Travel and logistics: flights and help finding them, when to arrive and how long to stay, passports, airports, hotels and hotel upgrades, staying at your own hotel, and transfers.",
     loadedBy: "router",
     tools: ["getClinicPackagesTool"],
-    prefetch: ["getClinicPackagesTool"],
+    prefetchNamed: ["getClinicPackagesTool"],
     version: 1,
     source: [
       "TRAVEL READINESS (passport / logistics)",
@@ -527,8 +532,22 @@ export const SKILL_SPECS: SkillSpec[] = [
       "STAGE-SPECIFIC BEHAVIOR: PRE_CLINICAL_SENT Step 3 (discounts)",
       "CAPABILITIES & CONSTRAINTS (discounts)",
     ],
-    // Line 1041, the GOOD example, states a real clinic's price and inclusions and is left out.
-    parts: [...range(1523, 1528), "", ...range(1038, 1040), "", 1322, "", 895, 903, "", 916, 923],
+    // Line 1041, the GOOD example, goes on to state a real clinic's price and inclusions. Only its
+    // opening, which shows how to acknowledge a quote, is kept.
+    parts: [
+      ...range(1523, 1528),
+      "",
+      ...range(1038, 1040),
+      [1041, { to: "it helps to know what Heva quoted directly." }],
+      "",
+      1322,
+      "",
+      895,
+      903,
+      "",
+      916,
+      923,
+    ],
   },
   {
     name: "creator-partnership",
@@ -643,6 +662,7 @@ export function renderSkill(spec: SkillSpec, packetLines: readonly string[]): st
     ...(spec.status ? [`status: ${spec.status}`] : []),
     `tools: ${inlineList(spec.tools ?? [])}`,
     `prefetch: ${inlineList(spec.prefetch ?? [])}`,
+    `prefetchNamed: ${inlineList(spec.prefetchNamed ?? [])}`,
     `staticLinks: ${inlineList(spec.staticLinks ?? [])}`,
     `policyAmounts: ${inlineList(spec.policyAmounts ?? [])}`,
     `version: ${spec.version}`,

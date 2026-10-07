@@ -10,7 +10,7 @@ import type { TurnLedger } from "../tools/ledger";
 import type { ToolName } from "../tools/registry";
 import type { ExtraFact } from "../subtasks/callHistory";
 import type { TraceEvent } from "../trace/types";
-import type { LinkKind, RouterOutput, SelfServeStep } from "./router";
+import type { Intent, LinkKind, RouterOutput, SelfServeStep } from "./router";
 import { computeAnchor, type Anchor } from "./stage";
 
 export interface Directives {
@@ -107,6 +107,13 @@ const LINK_SKILL: Record<LinkKind, string> = {
 const TOOL_ACTION_SKILL: Partial<Record<keyof typeof ACTION_CATALOG, string>> = {
   reschedule_consultation: "consultation",
   send_own_photos: "photos-intake",
+};
+
+/** The self-serve step a message with this primary intent is mainly about. */
+const INTENT_STEP: Partial<Record<Intent, SelfServeStep>> = {
+  payment: "pay_deposit",
+  consultation: "book_consultation",
+  photos: "upload_photos",
 };
 
 const PAUSE_SKILL = "pause-followup";
@@ -280,6 +287,12 @@ function prefetch(input: PlanInput, selected: readonly Skill[], resolved: readon
       for (const clinic of clinics) readOnce(ledger, tool, { clinicId: clinic.id }, "prefetch");
     }
   }
+
+  // Some skills only need clinic data when the patient names a clinic. Without a name they get none,
+  // which keeps facts nobody asked about out of the prompt. The responder can still call the tool.
+  for (const tool of new Set(selected.flatMap((skill) => skill.prefetchNamed))) {
+    for (const clinic of resolved) readOnce(ledger, tool, { clinicId: clinic.id }, "prefetch");
+  }
 }
 
 /**
@@ -349,6 +362,19 @@ function planLinks(
   const include: string[] = [];
   const precedence: PrecedenceDecision[] = [];
   const asked = new Set(router.entities.linksRequested);
+
+  // A message can touch two self-serve steps ("do I need a consultation before I pay?"). The reply
+  // carries the link for the step the message is mainly about, not one for each.
+  let steps: readonly SelfServeStep[] = router.selfServe;
+  const mainStep = INTENT_STEP[router.primaryIntent];
+  if (steps.length > 1 && mainStep && steps.includes(mainStep)) {
+    precedence.push({
+      rule: "one_self_serve_step",
+      decision: `The message is mainly about ${mainStep}. Links for ${steps.filter((step) => step !== mainStep).join(", ")} are left out.`,
+      beats: [],
+    });
+    steps = [mainStep];
+  }
   const alreadySent = (url: string) => context.text.chatList.includes(url);
 
   const add = (url: string, rule: string, why: string) => {
@@ -370,7 +396,7 @@ function planLinks(
 
   // --- Paying: payment link, checkout link or the assessment. Exactly one. ---
   const askedToPay = asked.has("payment") || selection.packageChosenNow;
-  const aboutPaying = router.selfServe.includes("pay_deposit") && !pausing;
+  const aboutPaying = steps.includes("pay_deposit") && !pausing;
   if ((askedToPay || aboutPaying) && loaded.has("payment-deposit") && !context.booking.hasActive) {
     const rule = askedToPay ? "explicit_link_request" : "self_serve_link";
     let url: string | null = null;
@@ -421,7 +447,7 @@ function planLinks(
       add(reschedule.url, "explicit_link_request", "The patient asked to move the consultation, and the tool returned a reschedule link.");
     } else if (asked.has("consultation") || (rescheduling && noneOnFile)) {
       add(CONSULTATION_URL, "explicit_link_request", "The patient asked for the consultation link, or asked to move a consultation that is not on file.");
-    } else if (!pausing && noneOnFile && aboutBookingAConsultation(router)) {
+    } else if (!pausing && noneOnFile && aboutBookingAConsultation(router, steps)) {
       add(CONSULTATION_URL, "self_serve_link", "The patient can book the consultation and none is on file.");
     }
   }
@@ -430,7 +456,7 @@ function planLinks(
   if (loaded.has("photos-intake")) {
     if (asked.has("photo_upload")) {
       add(IMAGE_UPLOAD_URL, "explicit_link_request", "The patient asked for the photo upload link.");
-    } else if (!pausing && router.selfServe.includes("upload_photos") && !context.images.hasImages) {
+    } else if (!pausing && steps.includes("upload_photos") && !context.images.hasImages) {
       add(IMAGE_UPLOAD_URL, "self_serve_link", "The patient can upload photos and none are on file.");
     }
   }
@@ -454,11 +480,8 @@ function planLinks(
  * The router flags the step. As a backstop, a message whose main intent is the consultation counts
  * too, unless it is about what was said on a past call.
  */
-function aboutBookingAConsultation(router: RouterOutput): boolean {
-  return (
-    router.selfServe.includes("book_consultation") ||
-    (router.primaryIntent === "consultation" && !router.needsCallHistory)
-  );
+function aboutBookingAConsultation(router: RouterOutput, steps: readonly SelfServeStep[]): boolean {
+  return steps.includes("book_consultation") || (router.primaryIntent === "consultation" && !router.needsCallHistory);
 }
 
 /** Timing for the procedure. A time the patient wants for a consultation call is not that. */
@@ -482,6 +505,7 @@ function impliedSkills(router: RouterOutput): string[] {
   }
   if (router.requestType === "pause") implied.push(PAUSE_SKILL);
   if (router.entities.packageLean === "selected") implied.push("payment-deposit");
+  if (router.entities.packages.length > 0) implied.push("clinic-packages");
   return implied;
 }
 
@@ -495,6 +519,7 @@ export function buildPlan(input: PlanInput): Plan {
   const loaded = [skills.core, ...(stage ? [stage] : []), ...selected];
 
   const needClinicData = selected.some((skill) => skill.prefetch.some((tool) => TOOL_BINDING[tool] === "clinic"));
+
   const resolvedClinics = resolveClinics(input, needClinicData);
   prefetch(input, selected, resolvedClinics);
 

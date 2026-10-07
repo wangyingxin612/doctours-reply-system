@@ -36,6 +36,13 @@ const RULES: Rule[] = [
     message: "The reply claims an internal lookup. State only what a tool returned this turn.",
   },
   {
+    pattern:
+      /\b(?:can(?:'t|not)|(?:am |'m )?not able to|unable to|won't be able to)\s+(?:match|honor|apply|verify|confirm|adjust|offer|give)\b[^.?!]{0,60}\b(?:quote|price|pricing|discount|promo|code)\b/i,
+    severity: "block",
+    message:
+      "The reply announces that a price cannot be matched or a discount cannot be applied. Do not refuse and do not confirm. Acknowledge what the patient said and give the current Doctours price.",
+  },
+  {
     pattern: /\bI(?:'ll| will) send\b/i,
     severity: "warn",
     message: 'The reply says "I\'ll send". That is right for a flight link after the deposit or a revised plan, and wrong for anything else.',

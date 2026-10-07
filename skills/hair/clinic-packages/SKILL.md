@@ -4,6 +4,7 @@ description: What a clinic's packages are and cost: package names, prices, depos
 loadedBy: router
 tools: [getClinicPackagesTool, getClinicDoctorsTool, getAllClinicsTool]
 prefetch: [getClinicPackagesTool]
+prefetchNamed: []
 staticLinks: []
 policyAmounts: []
 version: 1

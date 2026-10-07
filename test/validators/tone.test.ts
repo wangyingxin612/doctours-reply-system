@@ -40,6 +40,8 @@ describe("banned_phrases", () => {
     "I know you're waiting on the details, I'll find out.",
     "I'll call you tomorrow to go over it.",
     "I checked our side and I don't see the promo active in our system.",
+    "Thanks for sharing that. I can't match or adjust a direct quote.",
+    "I'm not able to apply a discount to that package.",
   ])("blocks: %s", (response) => {
     expect(severities(response)).toContain("block");
   });
