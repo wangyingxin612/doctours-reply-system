@@ -23,7 +23,6 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     requestType: "question",
     humanRequested: false,
     requestedActions: [],
-    sharedClinicQuote: false,
     selfServe: [],
     needsCallHistory: false,
     rationale: "test",
@@ -275,26 +274,37 @@ describe("planner: other stages", () => {
   });
 });
 
-describe("planner: a clinic's direct quote", () => {
-  const quoted = () => routed({ primaryIntent: "pricing_promos", intents: ["pricing_promos"], skills: [], sharedClinicQuote: true });
+describe("planner: a price from somewhere else", () => {
+  const pricing = (overrides: Parameters<typeof routed>[0] = {}) =>
+    routed({ primaryIntent: "pricing_promos", intents: ["pricing_promos"], skills: [], entities: { clinics: ["Dr. Hakan Clinic"] }, ...overrides });
+  const QUOTE = "Their office gave me a figure of 2,750 if I arrange it with them myself.";
 
-  it("tells the responder to acknowledge the quote and give the Doctours price, and loads the rule", () => {
-    const built = plan(quoted(), "The clinic told me a lower number if I go to them directly.").plan;
+  it("tells the responder to acknowledge the price and give the Doctours one, and loads the rule", () => {
+    const built = plan(pricing(), QUOTE).plan;
 
-    expect(built.directives.clinicQuote).toBe(true);
+    expect(built.directives.outsidePrice).toBe(true);
     expect(built.selected.map((skill) => skill.name)).toContain("pricing-promos");
-    expect(built.precedence.map((entry) => entry.rule)).toContain("clinic_direct_quote");
+    expect(built.precedence.map((entry) => entry.rule)).toContain("outside_price");
   });
 
   it("fetches the clinic's packages, so the Doctours price is in the facts", () => {
-    const { ledger } = plan(quoted(), "The clinic told me a lower number if I go to them directly.");
+    const { ledger } = plan(pricing(), QUOTE);
     expect(ledger.calls.filter((call) => call.name === "getClinicPackagesTool" && call.source === "prefetch").length).toBeGreaterThan(0);
   });
 
-  it("leaves the directive off for any other message", () => {
-    const built = plan(routed()).plan;
-    expect(built.directives.clinicQuote).toBe(false);
-    expect(built.precedence.map((entry) => entry.rule)).not.toContain("clinic_direct_quote");
+  it("finds the clinic by its name in the text when the router lists none", () => {
+    expect(plan(pricing({ entities: { clinics: [] } }), "Hakan's office gave me a figure of 2,750.").plan.directives.outsidePrice).toBe(true);
+  });
+
+  it.each([
+    ["the message states no amount", pricing(), "Their office said it would be cheaper if I arrange it with them myself."],
+    ["the message is not about pricing", routed({ entities: { clinics: ["Dr. Hakan Clinic"] } }), QUOTE],
+    ["no clinic is named", pricing({ entities: { clinics: [] } }), "Someone gave me a figure of 2,750."],
+    ["the patient asks for a discount", pricing({ requestedActions: [{ type: "request_discount", evidence: "can you do 2,750" }] }), "Can you do 2,750 at Hakan?"],
+  ])("leaves the directive off when %s", (_why, router, text) => {
+    const built = plan(router, text).plan;
+    expect(built.directives.outsidePrice).toBe(false);
+    expect(built.precedence.map((entry) => entry.rule)).not.toContain("outside_price");
   });
 });
 

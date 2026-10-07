@@ -23,8 +23,6 @@ humanRequested: true when the patient asks to talk to, or be passed to, a human,
 
 requestedActions: things the patient asks us to do now. Give one entry per action, with the type from the list under "Actions" and the patient's own words as evidence. A question is not an action, even when it is about one. Asking whether refunds are possible is a question. Asking us to refund a payment is an action. Use an empty list when the patient only asks questions.
 
-sharedClinicQuote: true when the patient tells us a specific price that a clinic quoted them directly, and does not ask us to match, beat or honor it. When they do ask that, it is the action match_or_honor_price, and this field is false. A price from an ad, or a price we gave them, is not a clinic's direct quote.
-
 selfServe: steps the patient can complete on their own on a Doctours page. List a step whenever the message asks anything about that step: how to do it, where, whether they can, how it works, or what it costs.
 - pay_deposit: how, where or whether they can pay or book the deposit, including paying from their assessment, and what the next step toward booking is.
 - book_consultation: anything about the free consultation call itself, such as its cost, its format, who it is with, or how to book it.

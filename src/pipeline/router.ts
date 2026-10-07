@@ -67,8 +67,6 @@ function routerSchema(skillNames: readonly string[]) {
         evidence: z.string(),
       }),
     ),
-    /** The patient passes on a price a clinic quoted them directly, and does not ask us to match it. */
-    sharedClinicQuote: z.boolean(),
     selfServe: z.array(z.enum(SELF_SERVE_STEPS)),
     entities: z.object({
       clinics: z.array(z.string()),

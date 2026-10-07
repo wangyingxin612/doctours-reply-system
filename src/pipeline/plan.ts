@@ -25,10 +25,10 @@ export interface Directives {
   /** The patient asked who or what they are talking to. The core rules have the answer: name and role. */
   identityQuestion: boolean;
   /**
-   * The patient passed on a price a clinic quoted them directly. The reply acknowledges it and gives
-   * the Doctours price. It says nothing about whether the quote can be matched.
+   * The message may cite a price from somewhere else, such as a clinic's direct quote. If it does,
+   * the reply acknowledges it and gives the Doctours price. It says nothing about matching it.
    */
-  clinicQuote: boolean;
+  outsidePrice: boolean;
 }
 
 /** One entry per place where code chose between rules. Written to the trace. */
@@ -130,8 +130,24 @@ const INTENT_STEP: Partial<Record<Intent, SelfServeStep>> = {
 };
 
 const PAUSE_SKILL = "pause-followup";
-/** Holds the original prompt's rule for a price a clinic quoted the patient directly. */
+/** Holds the original prompt's rules for a price or discount the patient brings from somewhere else. */
 const QUOTE_SKILL = "pricing-promos";
+
+/** An amount of money in the patient's words: "$2,600", "2,900", "2900". */
+const STATED_AMOUNT = /[$€£]\s?\d|\b\d{1,3}(?:[,.]\d{3})+\b|\b\d{3,}\b/;
+
+/**
+ * True when the message may pass on a price from somewhere else without asking us to act on it.
+ * Code reads this off what the router already says: a pricing message that names a clinic, states
+ * an amount and asks for no price action. A router field for it was tried first. Adding the field
+ * changed how the router read other messages, one of them a request for a person, so the router
+ * was left alone.
+ */
+function citesOutsidePrice({ router, text, context }: PlanInput): boolean {
+  const asksUsToAct = router.requestedActions.some((action) => action.type === "match_or_honor_price" || action.type === "request_discount");
+  const namesClinic = router.entities.clinics.length > 0 || knownClinicNames(context).some((name) => mentions(text, name));
+  return router.intents.includes("pricing_promos") && !asksUsToAct && namesClinic && STATED_AMOUNT.test(text);
+}
 const INTAKE_SKILL = "intake-collection";
 
 const CONSULTATION_URL = "https://www.doctours.com/consultation";
@@ -520,7 +536,6 @@ function impliedSkills(router: RouterOutput): string[] {
     if (forTool) implied.push(forTool);
   }
   if (router.requestType === "pause") implied.push(PAUSE_SKILL);
-  if (router.sharedClinicQuote) implied.push(QUOTE_SKILL);
   if (router.entities.packageLean === "selected") implied.push("payment-deposit");
   if (router.entities.packages.length > 0) implied.push("clinic-packages");
   return implied;
@@ -534,8 +549,11 @@ export function buildPlan(input: PlanInput): Plan {
   const anchor = computeAnchor(context, { pausing });
   const collecting = anchor.anchor === "none" ? [] : [INTAKE_SKILL];
 
+  const outsidePrice = citesOutsidePrice(input);
   const selectedNames = new Set(
-    [...router.skills, ...impliedSkills(router), ...collecting].filter((name) => skills.has(name) && name !== "core"),
+    [...router.skills, ...impliedSkills(router), ...(outsidePrice ? [QUOTE_SKILL] : []), ...collecting].filter(
+      (name) => skills.has(name) && name !== "core",
+    ),
   );
   const selected = [...selectedNames].sort().map((name) => skills.get(name));
   const stage = skills.stage(context.pipelineStatus);
@@ -561,12 +579,12 @@ export function buildPlan(input: PlanInput): Plan {
     });
   }
   precedence.push({ rule: "collection_anchor", decision: `anchor: ${anchor.anchor}. ${anchor.reason}`, beats: [] });
-  if (router.sharedClinicQuote) {
-    // The rule says never refuse the quote and never match it. Left to itself, the model announces
-    // that it cannot match, which is the refusal. So code settles it: the subject is not raised.
+  if (outsidePrice) {
+    // The rule says never refuse a clinic's quote and never match it. Left to itself, the model
+    // announces that it cannot match, which is the refusal. So code settles it: the subject is not raised.
     precedence.push({
-      rule: "clinic_direct_quote",
-      decision: "The patient passed on a clinic's direct quote: acknowledge it, give the Doctours price, and say nothing about matching it.",
+      rule: "outside_price",
+      decision: "The message may pass on a price from somewhere else: acknowledge it, give the Doctours price, and say nothing about matching it.",
       beats: ["say_plainly_what_you_cannot_do"],
     });
   }
@@ -590,7 +608,7 @@ export function buildPlan(input: PlanInput): Plan {
       pause: pausing,
       clarifyPackage: selection.ambiguousPackages,
       identityQuestion: router.intents.includes("identity"),
-      clinicQuote: router.sharedClinicQuote,
+      outsidePrice,
     },
     precedence,
     policyAmounts: [...new Set(loaded.flatMap((skill) => skill.policyAmounts))],
