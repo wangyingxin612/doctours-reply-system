@@ -72,7 +72,8 @@ export const ACTION_CATALOG = {
   send_link: {
     handling: { by: "tool", how: "link plan" },
     definition:
-      "Asks for a link: payment, checkout, assessment, consultation booking, photo upload or a clinic page. Includes saying they are ready to pay or book.",
+      "Asks us, in so many words, to send a link: payment, checkout, assessment, consultation booking, photo upload or a clinic page. Includes saying they are ready to pay or book now.",
+    notThis: "Asking whether or how they can pay, book or upload. That is a question.",
   },
   reschedule_consultation: {
     handling: { by: "tool", how: "getConsultationRescheduleLinkTool" },
