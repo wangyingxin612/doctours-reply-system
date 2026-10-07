@@ -22,7 +22,7 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 455 unit tests | No |
+| `npm test` | 457 unit tests | No |
 | `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
@@ -287,7 +287,7 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 455 unit tests pass.
+- 457 unit tests pass.
 - The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
 - **Dev set, 50 cases.** The last three runs passed 50 of 50. The third did so after one over-strict check of mine was corrected and its stored replies were scored again. In all three, every case that should escalate did, and none escalated that should not.
 - **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
