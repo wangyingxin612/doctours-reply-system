@@ -148,5 +148,5 @@ Plain English. Short sentences. No filler. Cover:
 
 - The plan in `PLAN.md` is approved. Build a thin end-to-end path for the five packet messages first, then fill out the remaining skills, planner rules and validators. Keep a working submission at every point.
 - Small commits with clear messages. Run unit tests before each commit.
-- After each milestone, a 3 to 5 sentence summary of the decisions made and why, so I can explain them in an interview.
+- After each milestone, a 3 to 5 sentence summary of the decisions made and why.
 - If time runs short, cut in this order: the unreachable stage skills, the full baseline run (keep the static token count), the refusal fallback. Keep the Monday report.
