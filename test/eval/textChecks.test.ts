@@ -225,3 +225,35 @@ describe("h-cherry: the same rule, for Cherry", () => {
     expect(failuresOf("h-cherry", response)).toEqual([messages.forbidden("try applying"), messages.hedge]);
   });
 });
+
+describe("monthly-payments: both options offered to a US patient, and no schedule", () => {
+  const { expect: checks } = caseOf("monthly-payments");
+  const missing = (index: number) => `missing: /${checks.mustMatch?.[index]}/`;
+  const forbidden = (index: number) => `must not appear: /${checks.mustNotMatch?.[index]}/`;
+
+  it.each([
+    "Yes, you can. Checkout collects the deposit first. After that, Klarna or PayPal can finance the remaining balance, and they show your exact terms at checkout. Approval is up to the lender. You can also use interest-free layaway, where you pick a monthly amount and it's charged automatically to your saved card until the remaining balance is paid. Just keep in mind the full balance needs to be paid before your procedure date.",
+    "Yes, you can. Checkout collects the deposit first. For the remaining balance after that, you can pay in full, finance it with Klarna or PayPal, or use interest-free layaway. Klarna and PayPal are available since you're in the US, and they show your exact terms at checkout. Lenders approve each application individually, so approval isn't guaranteed. With layaway you pick a monthly amount, it's charged to your saved card each month with no interest, and the full balance needs to be paid off before your procedure date.",
+    "Yes, you can. Checkout collects the deposit first. For the remaining balance after that, you have two options: Klarna or PayPal financing, which shows your exact terms at checkout and is subject to lender approval, or Doctours layaway. Layaway is interest-free with no application. You pick a monthly amount, and it's charged automatically to your saved card each month until the balance is paid. The full balance does need to be paid before the procedure, so you'd choose the monthly amount based on when you want to go.",
+  ])("passes a real reply: %s", (response) => {
+    expect(failuresOf("monthly-payments", response)).toEqual([]);
+  });
+
+  it("fails the answer meant for a patient outside the US and Canada", () => {
+    // The original prompt's own model answer for the other kind of patient. It names Klarna, PayPal and layaway.
+    const response =
+      "Monthly financing through Klarna or PayPal is only available for patients living in the US or Canada. You can pay the remaining balance in full. We also have interest-free layaway — that's a Doctours card plan, not the advertised financing.";
+    expect(failuresOf("monthly-payments", response)).toEqual([forbidden(0), forbidden(1)]);
+  });
+
+  it("fails a reply that states a payment schedule", () => {
+    // The original prompt's own example of what not to write.
+    const schedule = "Before any lender fees: 6 months: $948.33/month, 12 months: $474.17/month, 24 months: $237.08/month.";
+    expect(failuresOf("monthly-payments", `Yes, you can, with Klarna or PayPal. ${schedule} There's also interest-free layaway.`)).toEqual([forbidden(2), forbidden(3)]);
+    expect(failuresOf("monthly-payments", "Yes. Klarna or PayPal financing is 0% APR, or there's interest-free layaway.")).toEqual([forbidden(4)]);
+  });
+
+  it("fails a reply that leaves out lender financing", () => {
+    expect(failuresOf("monthly-payments", "Yes, you can use interest-free layaway for the remaining balance.")).toEqual([missing(0)]);
+  });
+});

@@ -634,11 +634,19 @@
       "financing"
     ],
     "text": "Can I pay it off monthly?",
+    "note": "This patient lives in the US, so lender financing and layaway are both on offer. The reply must not give the answer meant for a patient outside the US and Canada, and must not state a payment schedule.",
     "expect": {
       "escalate": false,
       "mustMatch": [
         "klarna|paypal",
         "layaway"
+      ],
+      "mustNotMatch": [
+        "only (available )?(for|to) (patients|people|those|residents)",
+        "not the advertised financing",
+        "\\$\\s?\\d[\\d,.]*\\s*(/|per|a|each)\\s*month",
+        "\\b\\d+\\s*months?\\s*:",
+        "\\bAPR\\b"
       ]
     }
   },
