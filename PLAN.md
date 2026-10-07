@@ -394,12 +394,12 @@ All accepted in review.
 | M4 Remaining skills | Done. 26 skills, every one built by `scripts/split-prompt.ts`. |
 | M5 Full router and planner | Done. |
 | M6 Remaining validators and failure handling | Done. Eleven validators. |
-| M7 Eval and tuning | Partly done, then blocked. 50 cases and `--repeat` exist. The last complete run passed 47 of 50 with escalation exactly right on all 50. The fixes for the other three are in the code and are not yet re-run. The flip-rate run, the effort comparison and a holdout run are blocked. |
+| M7 Eval and tuning | Done. 50 dev cases and 15 holdout cases. The last three dev runs passed 50 of 50. Over three runs per case, `escalate` flipped on 0 of 50. The holdout ran once: 15 of 15. Medium effort did not beat low. |
 | M8 Monday report | Done, and run on real traces. |
-| M9 README and wrap-up | README done. The baseline is the static size comparison (`npm run size`), the fallback named in 7.3. The full baseline run is blocked. |
+| M9 README and wrap-up | Done. The full baseline ran once (`npm run baseline`): the original prompt passed 31 of the 50 dev cases. The static size comparison (`npm run size`) is kept. |
 | M10 Unreachable stages | Done. No eval coverage, as planned. |
 
-The blocker is one thing: the API account ran out of credit during the third full eval run. `BLOCKERS.md` lists what to run once it has credit.
+The API account ran out of credit during the third full eval run. It was topped up the same day and every waiting run was done. `BLOCKERS.md` has the list, with each result.
 
 What the build changed from this plan, beyond what earlier sections already record:
 
@@ -410,5 +410,15 @@ What the build changed from this plan, beyond what earlier sections already reco
 - `prefetchNamed` was added to frontmatter, so a skill that only needs clinic data for a named clinic does not fetch it for every recommended clinic.
 - A validator blocks a reply that announces a price cannot be matched. The original prompt bans that sentence, and the model kept writing it.
 - An out-of-credit API account is a fatal error. Before the fix it produced a run of 50 escalations.
-- Asked directly whether it is a bot, the model says it is an AI. I left that as it is. The validator only blocks a claim to be human.
-- All 50 eval cases are dev cases. A real holdout has to be written after tuning and run once.
+- Asked directly whether it is a bot, the model says it is an AI. The validator only blocks a claim to be human.
+- The first 50 eval cases are dev cases. Fifteen holdout cases were written after tuning and run once.
+
+What the live runs after the top-up changed:
+
+- The responder gets one more model call, with no tools, when it spends its three calls on tool calls. The brief's "one repair, then a person" did not cover a draft that never arrives. Without this, such a message is a false escalation caused by the system.
+- A tool whose one possible result code already fetched is not offered to the model.
+- A directive, `identityQuestion`, carries the router's label to the responder, so the original prompt's identity rule, name and role, is applied when the patient asks whether they are talking to a bot.
+- The internal-vocabulary validator also blocks talk about the machinery, such as "the tool shows".
+- Each model call in a trace records the HTTP status of every attempt that failed and was retried.
+- `npm run eval -- --recheck <runDir>` scores a past run again from its traces, with no model call.
+- `npm run baseline` exists and has run. Its output schema makes the working-memory fields optional and not nullable, because the API accepts at most 16 nullable fields in one schema.
