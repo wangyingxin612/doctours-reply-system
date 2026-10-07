@@ -125,12 +125,12 @@ export function report(cases: readonly CaseRuns[], traces: readonly RunRecord[],
     console.log(`  repairs    ${traces.filter((trace) => trace.repairAttempts > 0).length} of ${traces.length} messages`);
 
     const cost = costsOf(calls);
-    const each = (total: number) => `${(total / traces.length).toFixed(4)} per message`;
+    const each = (total: number) => `$${(total / traces.length).toFixed(4)} per message`;
     const latencies = reached.map((trace) => trace.latencyMs).sort((a, b) => a - b);
     const seconds = (fraction: number) => `${(percentile(latencies, fraction) / 1000).toFixed(1)} s`;
     console.log("\nCost and speed:");
-    console.log(`  cost       ${cost.asRun.toFixed(2)} for ${traces.length} messages, ${each(cost.asRun)}`);
-    console.log(`  no cache   ${cost.uncached.toFixed(2)}, ${each(cost.uncached)}, if every input token were billed at the full rate`);
+    console.log(`  cost       $${cost.asRun.toFixed(2)} for ${traces.length} messages, ${each(cost.asRun)}`);
+    console.log(`  no cache   $${cost.uncached.toFixed(2)}, ${each(cost.uncached)}, if every input token were billed at the full rate`);
     if (cost.unpriced.length > 0) console.log(`  not priced ${cost.unpriced.join(", ")}: those calls are not in the cost`);
     console.log(`  latency    p50 ${seconds(0.5)}, p95 ${seconds(0.95)} for messages that reached a model`);
   }
