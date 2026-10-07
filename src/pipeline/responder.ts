@@ -85,8 +85,16 @@ function directivesBlock(plan: Plan): string {
   return ["# DIRECTIVES FOR THIS MESSAGE", "", JSON.stringify(plan.directives, null, 2)].join("\n");
 }
 
+/** The parts of the input that decide what the model is shown. */
+export type PromptInput = Pick<ResponderInput, "message" | "context" | "plan" | "ledger">;
+
+/** Everything the responder is shown for one message. Exported so its size can be measured offline. */
+export function renderResponderPrompt(input: PromptInput): { system: SystemBlock[]; prompt: string } {
+  return { system: systemBlocks(input), prompt: userPrompt(input) };
+}
+
 /** Stable text first, so prompt caching can reuse it: rules, then skills, then the patient, then this turn. */
-function systemBlocks(input: ResponderInput): SystemBlock[] {
+function systemBlocks(input: PromptInput): SystemBlock[] {
   const { plan, context, ledger } = input;
 
   const rules = [
@@ -113,7 +121,7 @@ function systemBlocks(input: ResponderInput): SystemBlock[] {
 }
 
 /** The packet's user-message template, unchanged. */
-function userPrompt(input: ResponderInput): string {
+function userPrompt(input: PromptInput): string {
   return fillPrompt(loadPrompt("user-message.txt"), {
     HUMAN_MESSAGE: input.message.text,
     RECENT_CONVERSATION_SUMMARY: input.context.text.recentConversationSummary,

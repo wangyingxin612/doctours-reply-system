@@ -11,6 +11,7 @@
     "eval": "tsx eval/run.ts",
     "report": "tsx src/cli/report.ts",
     "respond": "tsx src/cli/respond.ts",
+    "size": "tsx eval/baseline/size.ts",
     "smoke": "tsx scripts/smoke.ts",
     "split": "tsx scripts/split-prompt.ts",
     "test": "vitest run",

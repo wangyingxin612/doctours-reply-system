@@ -140,6 +140,9 @@ function changeSection(current: RunSummary, baseline: RunSummary): string[] {
     ),
     "",
     `Of the ${points(change)} points, ${points(mix)} come from a different mix of messages and ${points(rate)} from escalating the same kinds of message at a different rate.`,
+    ...(intents.some((effect) => effect.intent === "unclassified")
+      ? ["", "\"unclassified\" means the router failed before it could label the message. Read those rows together with the failure causes above, not as a change in what patients asked."]
+      : []),
   ];
 }
 
