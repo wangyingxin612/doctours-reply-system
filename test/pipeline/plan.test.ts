@@ -16,9 +16,9 @@ type RouterOverrides = Omit<Partial<RouterOutput>, "entities"> & { entities?: Pa
 
 function routed(overrides: RouterOverrides = {}): RouterOutput {
   const { entities, ...rest } = overrides;
+  const primaryIntent = rest.primaryIntent ?? "other";
   return {
-    primaryIntent: "other",
-    intents: ["other"],
+    primaryIntent,
     skills: [],
     requestType: "question",
     humanRequested: false,
@@ -28,6 +28,8 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     rationale: "test",
     confidence: "high",
     ...rest,
+    // As in the pipeline, the primary intent is always one of the intents.
+    intents: [...new Set([primaryIntent, ...(rest.intents ?? [])])],
     entities: {
       clinics: [],
       packages: [],
@@ -167,7 +169,7 @@ describe("planner: side effects", () => {
 
 describe("planner: the link rule", () => {
   it("includes the assessment link when the message is about paying and there is no booking", () => {
-    const { plan: built } = plan(routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"] }));
+    const { plan: built } = plan(routed({ primaryIntent: "payment", skills: ["payment-deposit"], selfServe: ["pay_deposit"] }));
 
     expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
     // The link was sent earlier in the thread and nobody asked for it. The rule beats both objections.
@@ -178,7 +180,7 @@ describe("planner: the link rule", () => {
   });
 
   it("loads the paying rules even if the router flagged the step but not the skill", () => {
-    const { plan: built } = plan(routed({ skills: [], selfServe: ["pay_deposit"] }));
+    const { plan: built } = plan(routed({ primaryIntent: "payment", skills: [], selfServe: ["pay_deposit"] }));
     expect(built.selected.map((skill) => skill.name)).toEqual(["payment-deposit"]);
     expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
   });
@@ -186,7 +188,7 @@ describe("planner: the link rule", () => {
   it("leaves the assessment link out when a booking is already on file", () => {
     const context = buildPacketContext();
     const booked = { ...context, booking: { ...context.booking, hasActive: true } };
-    const { plan: built } = plan(routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"] }), "how do I pay?", booked);
+    const { plan: built } = plan(routed({ primaryIntent: "payment", skills: ["payment-deposit"], selfServe: ["pay_deposit"] }), "how do I pay?", booked);
 
     expect(built.directives.links.include).toEqual([]);
   });
@@ -226,7 +228,12 @@ describe("planner: the link rule", () => {
 
   it("carries one self-serve link, for the step the message is mainly about", () => {
     const { plan: built } = plan(
-      routed({ primaryIntent: "payment", skills: ["payment-deposit", "consultation"], selfServe: ["pay_deposit", "book_consultation"] }),
+      routed({
+        primaryIntent: "payment",
+        intents: ["payment", "consultation"],
+        skills: ["payment-deposit", "consultation"],
+        selfServe: ["pay_deposit", "book_consultation"],
+      }),
     );
 
     expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
@@ -235,7 +242,7 @@ describe("planner: the link rule", () => {
 
   it("never lists the same link twice", () => {
     const { plan: built } = plan(
-      routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"], entities: { linksRequested: ["assessment"] } }),
+      routed({ primaryIntent: "payment", skills: ["payment-deposit"], selfServe: ["pay_deposit"], entities: { linksRequested: ["assessment"] } }),
     );
     expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
   });
@@ -271,6 +278,44 @@ describe("planner: other stages", () => {
   it("leaves the intake rules out when nothing is left to collect", () => {
     const { plan: built } = plan(routed({ skills: ["clinic-packages"] }));
     expect(built.selected.map((skill) => skill.name)).not.toContain("intake-collection");
+  });
+});
+
+describe("planner: a self-serve step the router flags without its intent", () => {
+  // What the router has returned for a question about a package's price and deposit, on some days.
+  const priceQuestion = () =>
+    routed({
+      primaryIntent: "clinic_packages",
+      intents: ["clinic_packages"],
+      skills: ["clinic-packages", "payment-deposit"],
+      selfServe: ["pay_deposit"],
+      entities: { clinics: ["Heva Clinic"], packages: ["Gold"] },
+    });
+
+  it("adds no link, and says why in the precedence log", () => {
+    const built = plan(priceQuestion(), "What do Gold and its deposit cost at Heva?").plan;
+
+    expect(built.directives.links.include).toEqual([]);
+    expect(built.precedence.map((entry) => entry.rule)).toContain("self_serve_step_needs_its_intent");
+  });
+
+  it("does not treat the named package as chosen, so nothing is saved", () => {
+    const { ledger } = plan(priceQuestion(), "What do Gold and its deposit cost at Heva?");
+    expect(ledger.calls.filter((call) => call.kind === "write")).toEqual([]);
+  });
+
+  it("still adds the link when the router lists the step's intent too", () => {
+    const paying = routed({
+      primaryIntent: "payment",
+      intents: ["payment", "clinic_packages"],
+      skills: ["clinic-packages", "payment-deposit"],
+      selfServe: ["pay_deposit"],
+      entities: { clinics: ["Heva Clinic"], packages: ["Gold"] },
+    });
+    const built = plan(paying, "How do I pay the deposit for Gold at Heva?").plan;
+
+    expect(built.directives.links.include).toHaveLength(1);
+    expect(built.precedence.map((entry) => entry.rule)).not.toContain("self_serve_step_needs_its_intent");
   });
 });
 
@@ -412,7 +457,12 @@ describe("planner: paying has one link, chosen by how decided the patient is", (
 
   it("points at the assessment when the patient only asks how paying works, even with a clinic in mind", () => {
     const { plan: built } = plan(
-      routed({ skills: ["payment-deposit"], selfServe: ["pay_deposit"], entities: { clinics: ["Heva Clinic"], clinicLean: "selected" } }),
+      routed({
+        primaryIntent: "payment",
+        skills: ["payment-deposit"],
+        selfServe: ["pay_deposit"],
+        entities: { clinics: ["Heva Clinic"], clinicLean: "selected" },
+      }),
     );
     expect(built.directives.links.include).toEqual([ASSESSMENT_URL]);
   });
@@ -445,6 +495,7 @@ describe("planner: paying has one link, chosen by how decided the patient is", (
   it("never sends a payment link and a checkout link together", () => {
     const { plan: built } = plan(
       routed({
+        primaryIntent: "payment",
         selfServe: ["pay_deposit"],
         entities: { clinics: ["Heva Clinic"], clinicLean: "selected", packages: ["Gold"], packageLean: "selected", linksRequested: ["payment"] },
       }),
@@ -474,8 +525,8 @@ describe("planner: other links", () => {
 
   it("offers the upload link only when photos are missing", () => {
     const context = buildPacketContext();
-    const onFile = plan(routed({ selfServe: ["upload_photos"] }));
-    const missing = plan(routed({ selfServe: ["upload_photos"] }), "how do I send photos?", { ...context, images: { hasImages: false, count: 0 } });
+    const onFile = plan(routed({ primaryIntent: "photos", selfServe: ["upload_photos"] }));
+    const missing = plan(routed({ primaryIntent: "photos", selfServe: ["upload_photos"] }), "how do I send photos?", { ...context, images: { hasImages: false, count: 0 } });
 
     expect(onFile.plan.directives.links.include).toEqual([]);
     expect(missing.plan.directives.links.include).toEqual(["https://www.doctours.com/image-upload"]);
@@ -508,7 +559,13 @@ describe("planner: other links", () => {
 describe("planner: pause", () => {
   it("adds no link, no anchor and no funnel step on a pause", () => {
     const { plan: built } = plan(
-      routed({ requestType: "pause", primaryIntent: "pause_followup", selfServe: ["pay_deposit", "book_consultation"] }),
+      // Both steps come with their intents, so it is the pause that keeps the links out.
+      routed({
+        requestType: "pause",
+        primaryIntent: "pause_followup",
+        intents: ["pause_followup", "payment", "consultation"],
+        selfServe: ["pay_deposit", "book_consultation"],
+      }),
     );
 
     expect(built.directives).toMatchObject({ pause: true, anchor: "none", links: { include: [] } });

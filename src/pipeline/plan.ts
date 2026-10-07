@@ -129,6 +129,17 @@ const INTENT_STEP: Partial<Record<Intent, SelfServeStep>> = {
   photos: "upload_photos",
 };
 
+/**
+ * The self-serve steps code acts on. The router has to say it twice: flag the step, and list the
+ * step's intent among the message's intents. Asked what a package and its deposit cost, the router
+ * has flagged pay_deposit on some days and not on others, for a request that was byte for byte the
+ * same, and the reply then carried a payment link nobody asked for. In every such case the intents
+ * said the message was about packages and not about paying.
+ */
+function confirmedSteps(router: RouterOutput): SelfServeStep[] {
+  return router.selfServe.filter((step) => router.intents.some((intent) => INTENT_STEP[intent] === step));
+}
+
 const PAUSE_SKILL = "pause-followup";
 /** Holds the original prompt's rules for a price or discount the patient brings from somewhere else. */
 const QUOTE_SKILL = "pricing-promos";
@@ -397,7 +408,15 @@ function planLinks(
 
   // A message can touch two self-serve steps ("do I need a consultation before I pay?"). The reply
   // carries the link for the step the message is mainly about, not one for each.
-  let steps: readonly SelfServeStep[] = router.selfServe;
+  let steps: readonly SelfServeStep[] = confirmedSteps(router);
+  const unconfirmed = router.selfServe.filter((step) => !steps.includes(step));
+  if (unconfirmed.length > 0) {
+    precedence.push({
+      rule: "self_serve_step_needs_its_intent",
+      decision: `The router flagged ${unconfirmed.join(", ")} and did not list that step's intent for the message. No link is added for it.`,
+      beats: [],
+    });
+  }
   const mainStep = INTENT_STEP[router.primaryIntent];
   if (steps.length > 1 && mainStep && steps.includes(mainStep)) {
     precedence.push({
@@ -564,7 +583,7 @@ export function buildPlan(input: PlanInput): Plan {
   const resolvedClinics = resolveClinics(input, needClinicData);
   prefetch(input, selected, resolvedClinics);
 
-  const wantsPayment = router.entities.linksRequested.includes("payment") || router.selfServe.includes("pay_deposit");
+  const wantsPayment = router.entities.linksRequested.includes("payment") || confirmedSteps(router).includes("pay_deposit");
   const selection = readSelection(input, resolvedClinics, wantsPayment);
   saveWhatThePatientSaid(input, selection);
 
