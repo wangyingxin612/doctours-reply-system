@@ -46,6 +46,14 @@ export interface CaseResult {
   actualEscalate: boolean;
 }
 
+/**
+ * Words that belong to the system and not to a coordinator, such as "the tool shows". The pipeline
+ * has a validator for this. The check here is separate and broader on purpose: it does not depend
+ * on that validator, it also runs on replies no validator saw, and a false alarm in the eval costs
+ * a look, not a reply.
+ */
+const MACHINERY_TALK = /\b(?:tools?|database|system prompt|my data|the data I have)\b/i;
+
 function sentenceCount(text: string): number {
   return text.split(/(?<=[.!?])\s+/).filter(Boolean).length;
 }
@@ -97,6 +105,9 @@ export function checkCase(testCase: EvalCase, reply: Reply, trace: Produced): Ca
   for (const violation of [...urlLastLine(reply, EMPTY_VALIDATION_CONTEXT), ...noMarkdown(reply, EMPTY_VALIDATION_CONTEXT)]) {
     failures.push(`${violation.validator}: ${violation.message}`);
   }
+
+  const machinery = MACHINERY_TALK.exec(response);
+  if (machinery) failures.push(`talks about the machinery: "${machinery[0]}"`);
 
   if (reply.escalate) {
     // The packet: one short sentence, optionally after one short decline, and then stop.

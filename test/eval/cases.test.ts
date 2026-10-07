@@ -141,6 +141,16 @@ describe("checkCase", () => {
     expect(failuresOf({ escalate: false }, reply({ response: "Gold includes **two nights** at the hotel." }))[0]).toMatch(/^no_markdown: /);
   });
 
+  it("fails any reply that talks about the machinery behind it, whatever the case asks for", () => {
+    expect(failuresOf({ escalate: false }, reply({ response: "Silver is $3,000. The tool shows 3 hotel nights included." }))).toEqual([
+      'talks about the machinery: "tool"',
+    ]);
+    expect(failuresOf({ escalate: false }, reply({ response: "The clinic has one package in my data." }))).toEqual([
+      'talks about the machinery: "my data"',
+    ]);
+    expect(failuresOf({ escalate: false }, reply({ response: "Silver is $3,000 and includes 3 hotel nights." }))).toEqual([]);
+  });
+
   it("holds an escalation to one short reply with a reason, no digits and no link", () => {
     expect(failuresOf({ escalate: true }, handoff())).toEqual([]);
     expect(failuresOf({ escalate: true }, handoff({ response: "I can't do that. I'm bringing in a person. They will call. Hold tight." }))).toEqual([

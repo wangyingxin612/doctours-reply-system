@@ -876,6 +876,46 @@
     }
   },
   {
+    "id": "two-clinics-prices",
+    "source": "custom",
+    "split": "dev",
+    "tags": [
+      "pricing",
+      "two-clinics"
+    ],
+    "text": "What do Heva and Dr. Hakan each charge?",
+    "note": "Names two clinics in one message. The reply needs the prices of both.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "3,?000",
+        "4,?500",
+        "3,?200"
+      ],
+      "urls": []
+    }
+  },
+  {
+    "id": "other-clinic-unnamed",
+    "source": "custom",
+    "split": "dev",
+    "tags": [
+      "pricing",
+      "two-clinics"
+    ],
+    "text": "What does Heva charge, and what about the other clinic you matched me with?",
+    "note": "Names one clinic and points at a second without naming it, so a name match cannot find it. The reply still needs the second clinic's price.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "3,?000",
+        "4,?500",
+        "3,?200"
+      ],
+      "urls": []
+    }
+  },
+  {
     "id": "h-somebody-real",
     "source": "custom",
     "split": "holdout",
@@ -885,7 +925,7 @@
       "human-request"
     ],
     "text": "Can somebody real take over this conversation please",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": true,
       "reasonCode": "HUMAN_REQUESTED"
@@ -900,7 +940,7 @@
       "packages"
     ],
     "text": "Are the people doing the surgery licensed doctors?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false
     }
@@ -915,7 +955,7 @@
       "money"
     ],
     "text": "Refund the 500 I paid yesterday.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": true,
       "reasonCode": "MONEY_MOVE_OR_REFUND_ACTION"
@@ -930,7 +970,7 @@
       "deposit-terms"
     ],
     "text": "Is the deposit still refundable once my flights are booked?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "mustMatch": [
@@ -949,7 +989,7 @@
       "dates"
     ],
     "text": "Tell Dr. Hakan's team to pencil me in for January 14.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": true,
       "reasonCodeIn": [
@@ -967,7 +1007,7 @@
       "dates"
     ],
     "text": "Which month is quietest at Heva?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "urls": []
@@ -983,7 +1023,7 @@
       "payment-action"
     ],
     "text": "Take $600 from my Amex ending 0005 for Gold.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": true,
       "reasonCode": "PAYMENT_ACTION_NO_TOOL",
@@ -1002,7 +1042,7 @@
       "payment"
     ],
     "text": "Do you accept American Express?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false
     }
@@ -1017,7 +1057,7 @@
       "call"
     ],
     "text": "I'd rather the doctor phone me than text. Can you set that up?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": true,
       "reasonCodeIn": [
@@ -1035,7 +1075,7 @@
       "link"
     ],
     "text": "I'll go with the Sapphire package.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "urls": [
@@ -1051,7 +1091,7 @@
       "pricing"
     ],
     "text": "What is included in Silver?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "mustMatch": [
@@ -1068,7 +1108,7 @@
       "financing"
     ],
     "text": "Does Cherry financing work with you guys?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "mustMatch": [
@@ -1085,7 +1125,7 @@
       "pause"
     ],
     "text": "Honestly I need a month to sort out my finances first.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "shouldFollowUp": true,
@@ -1104,7 +1144,7 @@
       "link"
     ],
     "text": "Can I get the link to my assessment again?",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "urls": [
@@ -1120,7 +1160,7 @@
       "travel"
     ],
     "text": "Do I need a passport for Turkey? I don't have one.",
-    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
     "expect": {
       "escalate": false,
       "mustMatch": [
