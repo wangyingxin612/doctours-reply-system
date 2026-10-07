@@ -1,6 +1,6 @@
 # Plan: Doctours reply system
 
-Status: approved on 2026-10-06. Built on the `build` branch. Section 10 has the state of each milestone. `BLOCKERS.md` has what is waiting on the owner.
+Written by Claude Code, and approved by the owner of this repository on 2026-10-06. "I" in this file is Claude Code. "The owner" is the person who wrote the design brief, reviewed this plan and made the decisions it records. Built on the `build` branch. Section 10 has the state of each milestone and what the build changed.
 
 I read `docs/packet.md` and `docs/design-brief.md` in full, including the whole original system prompt. The packet wins on hard requirements. Sections 6 and 7 record each review decision next to the reasoning. Section 9 lists what the review added.
 
@@ -394,12 +394,12 @@ All accepted in review.
 | M4 Remaining skills | Done. 26 skills, every one built by `scripts/split-prompt.ts`. |
 | M5 Full router and planner | Done. |
 | M6 Remaining validators and failure handling | Done. Eleven validators. |
-| M7 Eval and tuning | Done. 50 dev cases and 15 holdout cases. The last three dev runs passed 50 of 50. Over three runs per case on the final code, `escalate` flipped on 0 of 52. The holdout ran once: 15 of 15. Medium effort did not beat low. |
+| M7 Eval and tuning | Done. 52 dev cases and 15 holdout cases. On the final code, with each dev case run three times, 52 of 52 passed on every run and `escalate` flipped on 0 of 52. The holdout ran once: 15 of 15 as scored that day. Medium effort did not beat low. |
 | M8 Monday report | Done, and run on real traces. |
 | M9 README and wrap-up | Done. The full baseline ran once (`npm run baseline`): the original prompt passed 31 of the 50 dev cases. The static size comparison (`npm run size`) is kept. |
 | M10 Unreachable stages | Done. No eval coverage, as planned. |
 
-The API account ran out of credit during the third full eval run. It was topped up the same day and every waiting run was done. `BLOCKERS.md` has the list, with each result.
+The API account ran out of credit during the third full eval run. It was topped up the same day and every waiting run was done. The README's "Verification status" has the results.
 
 What the build changed from this plan, beyond what earlier sections already record:
 
@@ -423,3 +423,11 @@ What the live runs after the top-up changed:
 - `npm run eval -- --recheck <runDir>` scores a past run again from its traces, with no model call.
 - The eval has two more kinds of text check: one on the first sentence, and one that bans a pattern inside sentences about a subject. The Medicaid, CareCredit and Cherry cases use them. `test/eval/textChecks.test.ts` runs the checks of those cases, and of the monthly-payment case, on replies known to be good and bad.
 - `npm run baseline` exists and has run. Its output schema makes the working-memory fields optional and not nullable, because the API accepts at most 16 nullable fields in one schema.
+
+What the owner's review of those changes added:
+
+- A directive, `outsidePrice`, for a message that passes on a price from somewhere else, such as a clinic's direct quote. Before it, the first draft told the patient the quote could not be matched on every run, and only the validator and a repair got the reply out. The owner asked for a router field to trigger it. The field worked, but with it the router stopped reading one request for a person as one. So the field was taken out, and code reads the trigger off what the router already says.
+- The planner acts on a self-serve step only when the router also lists the step's intent. The router answered one unchanged request two ways, and one of them added a payment link nobody asked for.
+- The router's prompt is treated as fragile. Two small edits to it each coincided with a message being read differently, and the router also varies with no edit at all. Removing its rationale made the median call 0.3 seconds faster and was reverted under the rule the owner set for the experiment: revert if any message changes sides.
+- Each attempt of a router call has 8 seconds to answer before it is dropped and retried.
+- The Monday report gives repairs by validator and by intent, and latency for each stage.
