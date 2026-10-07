@@ -68,6 +68,16 @@ describe("banned_phrases", () => {
   });
 
   it.each([
+    ["I can't change your procedure date through this thread.", "channel_talk"],
+    ["Let me look into that for you.", "stalling"],
+    ["I'll call you tomorrow to go over it.", "call_offer"],
+    ["I checked our side and I don't see the promo active in our system.", "internal_lookup"],
+    ["I can't match that.", "price_refusal"],
+  ])("names the rule that fired, for the report: %s", (response, rule) => {
+    expect(bannedPhrases(reply(response), context).map((violation) => violation.rule)).toContain(rule);
+  });
+
+  it.each([
     "When you're finished, just send done and I'll check it.",
     "Yes, I can help with flights! After the deposit I'll send you a link with flight options.",
   ])("warns without blocking, because the original prompt requires it in places: %s", (response) => {

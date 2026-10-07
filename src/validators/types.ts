@@ -5,6 +5,8 @@ export type Severity = "block" | "warn";
 
 export interface Violation {
   validator: string;
+  /** The rule inside the validator, when it has more than one. */
+  rule?: string;
   severity: Severity;
   /** Written so it can be fed back to the model in a repair attempt. */
   message: string;

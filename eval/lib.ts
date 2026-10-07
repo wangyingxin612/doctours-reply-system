@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
 import { costOf } from "../config/pricing";
-import { loadRun, percentile, retriesOf } from "../src/report/aggregate";
+import { loadRun, percentile, retriesOf, stageLatencyOf } from "../src/report/aggregate";
 import type { ModelCallTrace, Trace } from "../src/trace/types";
 import { caseSchema, checkCase, type CaseResult, type EvalCase } from "./assert";
 
@@ -133,6 +133,9 @@ export function report(cases: readonly CaseRuns[], traces: readonly RunRecord[],
     console.log(`  no cache   $${cost.uncached.toFixed(2)}, ${each(cost.uncached)}, if every input token were billed at the full rate`);
     if (cost.unpriced.length > 0) console.log(`  not priced ${cost.unpriced.join(", ")}: those calls are not in the cost`);
     console.log(`  latency    p50 ${seconds(0.5)}, p95 ${seconds(0.95)} for messages that reached a model`);
+    for (const [stage, latency] of Object.entries(stageLatencyOf(calls))) {
+      console.log(`  ${`${stage} call`.padEnd(10)} p50 ${(latency.p50 / 1000).toFixed(1)} s, p95 ${(latency.p95 / 1000).toFixed(1)} s over ${latency.calls} calls`);
+    }
     const retries = retriesOf(calls);
     const causes = Object.entries(retries.byStatus).map(([status, attempts]) => `${status}: ${attempts}`);
     console.log(`  retried    ${retries.calls} of ${retries.ofCalls} model calls${causes.length > 0 ? ` (failed attempts: ${causes.join(", ")})` : ""}`);

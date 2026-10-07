@@ -77,6 +77,39 @@ export interface RunSummary {
   latencyMs: { p50: number; p95: number; answeredP50: number; answeredP95: number };
   /** Model calls that got through only after a retry, and the HTTP statuses that caused the retries. */
   retries: { calls: number; ofCalls: number; byStatus: Record<string, number> };
+  /** Messages the responder wrote a draft for. Repairs are counted against these. */
+  drafted: number;
+  /** Per validator, and rule where it has one: messages whose first draft it blocked. A draft can be blocked by more than one. */
+  blockedBy: Record<string, number>;
+  /** Drafted and repaired messages by primary intent. */
+  repairsByIntent: Record<string, { drafted: number; repaired: number }>;
+  /** Latency of the model calls of each stage, in milliseconds. */
+  stageLatencyMs: Record<string, StageLatency>;
+}
+
+export interface StageLatency {
+  calls: number;
+  p50: number;
+  p95: number;
+}
+
+/** Latency of the model calls of each stage. One slow stage hides inside an end-to-end number. */
+export function stageLatencyOf(calls: readonly ModelCallTrace[]): Record<string, StageLatency> {
+  const byStage: Record<string, number[]> = {};
+  for (const call of calls) (byStage[call.stage] ??= []).push(call.latencyMs);
+  return Object.fromEntries(
+    Object.entries(byStage).map(([stage, latencies]) => {
+      const sorted = [...latencies].sort((a, b) => a - b);
+      return [stage, { calls: sorted.length, p50: percentile(sorted, 0.5), p95: percentile(sorted, 0.95) }];
+    }),
+  );
+}
+
+/** The validators, and rules, that blocked a message's first draft. Each is named once. */
+function firstDraftBlockers(trace: Trace): string[] {
+  const first = trace.validation.find((entry) => entry.attempt === 1);
+  const blocking = (first?.violations ?? []).filter((violation) => violation.severity === "block");
+  return [...new Set(blocking.map((violation) => (violation.rule ? `${violation.validator}: ${violation.rule}` : violation.validator)))];
 }
 
 /** How many model calls needed a retry, and why. Status 0 is a request that got no response. */
@@ -116,6 +149,14 @@ export function summarize(traces: readonly Trace[]): RunSummary {
     else cost += callCost;
   }
 
+  const drafted = traces.filter((trace) => trace.modelCalls.some((call) => call.stage === "responder"));
+  const repairsByIntent: RunSummary["repairsByIntent"] = {};
+  for (const trace of drafted) {
+    const entry = (repairsByIntent[intentOf(trace)] ??= { drafted: 0, repaired: 0 });
+    entry.drafted += 1;
+    if (trace.repairAttempts > 0) entry.repaired += 1;
+  }
+
   const latencies = traces.map((trace) => trace.latencyMs).sort((a, b) => a - b);
   const answeredLatencies = answered.map((trace) => trace.latencyMs).sort((a, b) => a - b);
 
@@ -145,5 +186,9 @@ export function summarize(traces: readonly Trace[]): RunSummary {
       answeredP95: percentile(answeredLatencies, 0.95),
     },
     retries: retriesOf(traces.flatMap((trace) => trace.modelCalls)),
+    drafted: drafted.length,
+    blockedBy: count(drafted.flatMap(firstDraftBlockers)),
+    repairsByIntent,
+    stageLatencyMs: stageLatencyOf(traces.flatMap((trace) => trace.modelCalls)),
   };
 }

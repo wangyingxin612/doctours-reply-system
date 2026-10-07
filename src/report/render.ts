@@ -75,6 +75,30 @@ function answeredSection(run: RunSummary): string[] {
   ];
 }
 
+function repairSection(run: RunSummary): string[] {
+  const share = (part: number, whole: number) => (whole === 0 ? 0 : part / whole);
+  const lines = [
+    "## Repairs",
+    "",
+    `${run.repairs} of ${run.drafted} drafted messages needed a repair (${percent(share(run.repairs, run.drafted))}). A repair is a second model call, made when a validator blocks the first draft. It costs money and time even when it ends well.`,
+  ];
+
+  const blockers = Object.entries(run.blockedBy).sort((a, b) => b[1] - a[1]);
+  if (blockers.length > 0) {
+    lines.push("", "By what blocked the first draft. A draft can be blocked by more than one check, so the rows can add up to more than the repairs.", "");
+    lines.push(table(["Validator", "First drafts blocked", "Share of drafts"], blockers.map(([name, drafts]) => [name, String(drafts), percent(share(drafts, run.drafted))])));
+  }
+
+  const intents = Object.entries(run.repairsByIntent)
+    .filter(([, entry]) => entry.repaired > 0)
+    .sort((a, b) => b[1].repaired - a[1].repaired);
+  if (intents.length > 0) {
+    lines.push("", "By intent. Intents with no repair are left out.", "");
+    lines.push(table(["Intent", "Drafted", "Repaired", "Repair rate"], intents.map(([intent, entry]) => [intent, String(entry.drafted), String(entry.repaired), percent(share(entry.repaired, entry.drafted))])));
+  }
+  return lines;
+}
+
 function costSection(run: RunSummary): string[] {
   const row = (stage: string, tokens: StageTokens) => [stage, String(tokens.calls), String(tokens.input), String(tokens.cacheRead), String(tokens.cacheWrite), String(tokens.output)];
   const lines = [
@@ -93,6 +117,11 @@ function costSection(run: RunSummary): string[] {
     "",
     `Latency: p50 ${run.latencyMs.p50} ms and p95 ${run.latencyMs.p95} ms over all messages. For answered messages, p50 ${run.latencyMs.answeredP50} ms and p95 ${run.latencyMs.answeredP95} ms.`,
   );
+  const stageLatencies = Object.entries(run.stageLatencyMs);
+  if (stageLatencies.length > 0) {
+    lines.push("", "Latency of each stage's model calls, in milliseconds. A message's latency is the sum of its stages, plus any wait between retries.", "");
+    lines.push(table(["Stage", "Calls", "p50", "p95"], stageLatencies.map(([stage, latency]) => [stage, String(latency.calls), String(latency.p50), String(latency.p95)])));
+  }
   if (run.retries.ofCalls > 0) {
     const causes = Object.entries(run.retries.byStatus)
       .sort((a, b) => b[1] - a[1])
@@ -167,6 +196,8 @@ export function renderReport(current: RunSummary, baseline?: RunSummary): string
     ...rateSection(current),
     "",
     ...answeredSection(current),
+    "",
+    ...repairSection(current),
     "",
     ...costSection(current),
   ];

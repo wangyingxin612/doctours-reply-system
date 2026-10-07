@@ -9,6 +9,8 @@ import type { Trace } from "../../src/trace/types";
 
 interface Spec {
   intent: string;
+  /** Blocking violations on the first draft. Any makes the message a repaired one. */
+  blockedBy?: Array<{ validator: string; rule?: string }>;
   code?: ReasonCode;
   decidedBy?: Trace["decision"]["decidedBy"];
   failure?: Trace["failure"];
@@ -37,8 +39,13 @@ function trace(spec: Spec, runId = "run"): Trace {
     events: [],
     directives: null,
     precedence: [],
-    validation: [],
-    repairAttempts: 0,
+    validation: spec.blockedBy
+      ? [
+          { attempt: 1, violations: spec.blockedBy.map((blocker) => ({ ...blocker, severity: "block" as const, message: "blocked" })) },
+          { attempt: 2, violations: [] },
+        ]
+      : [],
+    repairAttempts: spec.blockedBy ? 1 : 0,
     decision: {
       escalate,
       reasonCode: spec.code ?? null,
@@ -165,6 +172,75 @@ describe("run summary", () => {
   it("gives a guard decision its intent even in a trace that recorded none", () => {
     const old = { ...trace({ intent: "x", code: "HUMAN_REQUESTED", decidedBy: "guard" }), primaryIntent: null };
     expect(intentOf(old)).toBe("human_request");
+  });
+});
+
+describe("repairs and stage latency", () => {
+  const call = (stage: "router" | "responder" | "repair", latencyMs: number) => ({
+    stage,
+    model: stage === "router" ? "claude-haiku-4-5-20251001" : "claude-sonnet-5-5",
+    inputTokens: 100,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 10,
+    reasoningTokens: 0,
+    steps: 1,
+    latencyMs,
+  });
+  const answered = (intent: string, blockedBy?: Spec["blockedBy"]) =>
+    trace({ intent, blockedBy, modelCalls: [call("router", 3000), call("responder", 2000), ...(blockedBy ? [call("repair", 2500)] : [])] });
+
+  const summary = summarize([
+    answered("pricing_promos", [{ validator: "banned_phrases", rule: "price_refusal" }]),
+    answered("pricing_promos", [{ validator: "banned_phrases", rule: "price_refusal" }, { validator: "price_grounding" }]),
+    answered("pricing_promos"),
+    answered("consultation", [{ validator: "url_provenance" }]),
+    answered("travel"),
+    // Escalated by the router: one model call, no draft, so it is not in the repair rate.
+    trace({ intent: "human_request", code: "HUMAN_REQUESTED", modelCalls: [call("router", 9000)] }),
+    // Escalated by the guard: no model call at all.
+    trace({ intent: "human_request", code: "HUMAN_REQUESTED", decidedBy: "guard" }),
+  ]);
+
+  it("counts repairs against the messages that got a draft", () => {
+    expect(summary.drafted).toBe(5);
+    expect(summary.repairs).toBe(3);
+  });
+
+  it("names what blocked each first draft, by validator and rule, once per message", () => {
+    expect(summary.blockedBy).toEqual({ "banned_phrases: price_refusal": 2, price_grounding: 1, url_provenance: 1 });
+  });
+
+  it("splits repairs by primary intent", () => {
+    expect(summary.repairsByIntent).toEqual({
+      pricing_promos: { drafted: 3, repaired: 2 },
+      consultation: { drafted: 1, repaired: 1 },
+      travel: { drafted: 1, repaired: 0 },
+    });
+  });
+
+  it("gives the latency of each stage's calls", () => {
+    expect(summary.stageLatencyMs).toEqual({
+      router: { calls: 6, p50: 3000, p95: 9000 },
+      responder: { calls: 5, p50: 2000, p95: 2000 },
+      repair: { calls: 3, p50: 2500, p95: 2500 },
+    });
+  });
+
+  it("renders the repair tables and the stage table", () => {
+    const report = renderReport(summary);
+
+    expect(report).toContain("3 of 5 drafted messages needed a repair (60.0%)");
+    expect(report).toContain("| banned_phrases: price_refusal | 2 | 40.0% |");
+    expect(report).toContain("| pricing_promos | 3 | 2 | 66.7% |");
+    expect(report).not.toContain("| travel | 1 | 0 |");
+    expect(report).toContain("| router | 6 | 3000 | 9000 |");
+  });
+
+  it("says so plainly when nothing needed a repair", () => {
+    const clean = renderReport(summarize([answered("travel")]));
+    expect(clean).toContain("0 of 1 drafted messages needed a repair (0.0%)");
+    expect(clean).not.toContain("By what blocked the first draft");
   });
 });
 
