@@ -151,6 +151,10 @@ describe("no_internal_tokens", () => {
     "The clinic has one package in my data, at 3,200 USD.",
     "The clinic has one package in the data I have.",
     "According to the system, your photos are in.",
+    // Got past the rule in a live run: "No tool" has no "the" or "my" in front of it.
+    "I don't have a reliable drive time from the airport. No tool gives me one, and traffic varies a lot.",
+    "No tool gives me drive times, so I won't guess.",
+    "I don't have a tool for that.",
   ])("blocks: %s", (response) => {
     expect(noInternalTokens(reply(response), context)).toHaveLength(1);
   });
@@ -163,6 +167,7 @@ describe("no_internal_tokens", () => {
     "Silver books Mon, Tue, Thu and Fri.",
     "I don't have that detail for Silver. It lists 3 hotel nights as included.",
     "The doctor uses fine tools for the hairline incisions.",
+    "Sapphire FUE is done with sapphire-tipped tools.",
     "Your data stays with Doctours and the clinic you choose.",
   ])("passes ordinary text, and ids inside a link: %s", (response) => {
     expect(noInternalTokens(reply(response), context)).toEqual([]);
