@@ -26,6 +26,7 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     sharedClinicQuote: false,
     selfServe: [],
     needsCallHistory: false,
+    rationale: "test",
     confidence: "high",
     ...rest,
     entities: {
