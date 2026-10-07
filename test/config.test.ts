@@ -8,7 +8,7 @@ describe("model config", () => {
       responderModel: "claude-sonnet-5-5",
       responderEffort: "low",
       maxRetries: 5,
-      routerAttemptTimeoutMs: 8000,
+      routerAttemptTimeoutMs: 20_000,
       responderFallbacks: false,
     });
   });

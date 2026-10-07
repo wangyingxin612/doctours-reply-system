@@ -11,8 +11,12 @@ export interface ModelConfig {
   maxRetries: number;
   /**
    * How long one HTTP attempt of a router call may wait for a response, in milliseconds. After that
-   * the attempt is dropped and retried. A healthy router call answers in about 4 seconds, and a
-   * request that hangs has been seen to take 55. 0 turns the limit off.
+   * the attempt is dropped and retried. 0 turns the limit off.
+   *
+   * The default leaves room for a slow start. A healthy router call answers in about 4 seconds.
+   * The first calls after the router's output schema changes took 7, while the API prepared the
+   * schema, and anyone who runs this with their own key starts there. Requests that hang have
+   * taken 27 and 55 seconds, and those are what the limit is for.
    */
   routerAttemptTimeoutMs: number;
   /**
@@ -24,7 +28,7 @@ export interface ModelConfig {
 
 export const DEFAULT_ROUTER_MODEL = "claude-haiku-4-5-20251001";
 export const DEFAULT_RESPONDER_MODEL = "claude-sonnet-5-5";
-export const DEFAULT_ROUTER_ATTEMPT_TIMEOUT_MS = 8000;
+export const DEFAULT_ROUTER_ATTEMPT_TIMEOUT_MS = 20_000;
 
 function effortFromEnv(value: string | undefined): Effort {
   const effort = value?.trim().toLowerCase();
