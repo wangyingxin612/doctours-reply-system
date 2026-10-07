@@ -2,7 +2,6 @@
 
 import { z } from "zod";
 import { replySchema, type Reply } from "../src/schema/reply";
-import type { Trace } from "../src/trace/types";
 import { noMarkdown } from "../src/validators/noMarkdown";
 import { extractUrls } from "../src/validators/text";
 import { EMPTY_VALIDATION_CONTEXT } from "../src/validators/types";
@@ -51,7 +50,13 @@ function sentenceCount(text: string): number {
   return text.split(/(?<=[.!?])\s+/).filter(Boolean).length;
 }
 
-export function checkCase(testCase: EvalCase, reply: Reply, trace: Trace): CaseResult {
+/** What a check reads about how a reply was produced. A pipeline trace has both fields. */
+export interface Produced {
+  failure: { cause: string; detail: string } | null;
+  decision: { reasonCode: string | null };
+}
+
+export function checkCase(testCase: EvalCase, reply: Reply, trace: Produced): CaseResult {
   const failures: string[] = [];
   const { expect } = testCase;
   const { response } = reply;
