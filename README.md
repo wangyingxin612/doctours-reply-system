@@ -12,15 +12,15 @@ I designed the approach and the escalation policy, and reviewed every decision. 
 
 Measured on 2026-10-07. "Verification status" has the detail and the limits of each number.
 
-- **Escalation.** On the 52 dev cases, each run three times, every message that should go to a person did, none went that should not, and no case changed sides between runs.
-- **Replies.** All 52 dev cases passed on all three runs. A holdout of 15 cases, written after tuning and run once, passed 15 of 15 as scored that day, and 14 of 15 under a check added after its replies were read.
-- **Against the original prompt.** On the 36 cases that need an answer, the original prompt passed 29 and this system 36. The original prompt has no escalation path, so the 14 cases that need a person are counted apart: 2 against 14.
+- **Escalation.** On the 54 dev cases, each run three times, every message that should go to a person did, none went that should not, and no case changed sides between runs.
+- **Replies.** 53 of the 54 dev cases passed on all three runs. One reply slipped on wording on two of its three runs: it said "No tool gives me one". A validator now blocks that. A holdout of 15 cases, written after tuning and run once, passed 15 of 15 as scored that day, and 14 of 15 under a check added after its replies were read.
+- **Against the original prompt.** On the 36 cases that need an answer, the original prompt passed 29. This system passed 35, 35 and 36 on its last three runs. The original prompt has no escalation path, so the 14 cases that need a person are counted apart: 2 against 14.
 - **Cost.** A message costs about a third of what it costs with the original prompt when both use prompt caching, $0.011 against $0.034, and about a ninth without caching.
-- **Speed.** The median reply takes about a second longer than the original prompt's, 6.0 s against 4.8 s, because a small model classifies the message first. The slowest replies are faster, 9.0 s against 15.6 s at the 95th percentile.
+- **Speed.** The median reply takes about a second longer than the original prompt's, 6.0 s against 4.8 s, because a small model classifies the message first. The slowest replies are faster, 11.0 s against 15.6 s at the 95th percentile.
 
 ## How to run
 
-You need Node.js 22.12 or later (developed on Node 24) and an Anthropic API key with credit.
+You need Node.js 24 and an Anthropic API key with credit. This was built and tested on Node 24. `.nvmrc` names it, so `nvm use` picks it up. Older versions are untested.
 
 ```
 npm install
@@ -36,8 +36,8 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 539 unit tests | No |
-| `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
+| `npm test` | 574 unit tests | No |
+| `npm run eval` | Runs the 69 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
 | `npm run report -- <runDir> [<baselineRunDir>]` | The Monday escalation report for a run, with the change against a baseline | No |
@@ -68,14 +68,14 @@ The small model says what a message is. Code says what to do about it. That one 
 | 2. A trace cannot show which part of the prompt produced a reply | The trace lists the skills loaded. Each skill's frontmatter names the sections of the original prompt it came from. |
 | 3. A new line of care means pasting another domain into the prompt | A vertical is a folder: `skills/<vertical>/`. The patient context names the vertical. Fertility would be a new folder, with no edit to `skills/hair/`. |
 | 4. A subtask has nowhere to go | `src/subtasks/`. The call-history subtask reads call records so the responder does not have to. See "Where a subtask goes". |
-| 5. Every message pays for the full prompt | A message the guard escalates uses no model at all. An answered message uses about 4,900 router tokens and 14,400 responder tokens, most of them a cached prefix. Measured on the same cases, the original prompt reads about 128,000 input tokens per message. |
+| 5. Every message pays for the full prompt | A message the guard escalates uses no model at all. An answered message uses about 4,900 router tokens and 14,800 responder tokens, most of them a cached prefix. Measured on the same cases, the original prompt reads about 128,000 input tokens per message. |
 | 6. A small policy change alters replies that never needed it | A rule lives in one skill. A reply that did not load the skill cannot be changed by it. Financing rules are also gated on the patient's flag, so a US patient's reply never sees the non-US branch. |
 | 7. Conflicting rules, and nothing records which won | Precedence is code. Each trace has a precedence log, for example "self_serve_link beats no_next_step_cta, no_repeated_links". |
 | 8. One behavior cannot be tested alone | The guard, the policy tables, each validator, the planner and the link rules each have unit tests. The eval tags each case by behavior. A wrong price fails `price_grounding`; a wrong tone fails `banned_phrases`. |
 
 ## What is loaded on every turn
 
-For a message that reaches the responder, about 25,000 characters are always there: `core` (15,000), the stage skill (3,300), our own frame that explains the prompt (3,700), the patient context (1,200) and the packet's user-message template (1,900). Everything else loads only when needed.
+For a message that reaches the responder, about 25,000 characters are always there: `core` (15,000), the stage skill (3,300), our own frame that explains the prompt (4,200), the patient context (1,300) and the packet's user message with its conversation summary (1,200). Everything else loads only when needed.
 
 `core` holds identity, voice, plain-text SMS rules, the grounding rule, link placement, the do-not-over-commit rules and the output fields. A test caps its size.
 
@@ -102,7 +102,7 @@ A skill can gate a block on a patient flag. FINANCING GEOGRAPHY, HEALTH INSURANC
 
 `escalate` is true when a person must take over. There are three ways to get there.
 
-1. **The patient asks for a human.** Explicit wording is caught by the guard with no model call. Looser wording is caught by the router.
+1. **The patient asks for a human.** The guard catches the plain ways of saying it with no model call: "I want to talk to a human", "Can I talk to someone about this?", "Is there someone I can speak with?". The router catches looser wording.
 2. **The patient asks for an action that no tool and no rule can perform.** The router names the action. The action catalog maps it to a reason code.
 3. **The system fails.** A model error, a refusal, or a reply that still breaks a rule after one repair.
 
@@ -136,6 +136,7 @@ Requests that look like escalations and are not, because a tool or a rule from t
 - Asking for a discount. The reply gives the current price.
 - Asking to move the free consultation. A tool handles it.
 - A creator or partnership message. The reply gives the partnerships manager's email, as the original prompt says.
+- Asking whether they have to talk to a person before they can pay. That is a question about the process. It does not ask for a person.
 - Asking whether they are talking to a bot. The router labels it an identity question, and a directive points the responder at the original prompt's identity rule. The reply gives the coordinator's name and role, and says it is an AI. A validator blocks any claim to be human.
 
 If the router misses an action, the responder falls back to the original prompt's behavior: decline plainly and answer the rest. A validator blocks any promise that a person will follow up when `escalate` is false, so a miss cannot produce a false handoff.
@@ -173,6 +174,8 @@ Each message writes `traces/<run>/<position>-<id>.json`: the policy version, the
 - Retried calls: how many model calls got through only after a retry, and what failed. API trouble that retries absorb shows up here and in latency. It never reaches the escalation rate.
 - Against a baseline: the change split by reason code, and by intent into mix and rate. Both splits are exact. Their parts add up to the change with nothing left over.
 
+`docs/sample-report.md` is a whole report, from two real runs, with a note on how to read it.
+
 **Reading it.** This is from two real runs of the eval set. The rate jumped from 28% to 100%.
 
 ```
@@ -203,34 +206,34 @@ The subtask has its own prompt, its own entry in the trace and its own token cou
 
 ## Cost and speed
 
-Both systems were run on the 50 dev cases on 2026-10-07. `npm run baseline` runs the original prompt the way the packet's Flow section describes: the filled prompt as the system message, all 14 tools in the model's hands, one `Reply` back. It uses the same model and effort as this system's responder, and the same checks, except reason codes, which the original prompt does not have. All it is told about escalation is the packet's own note on the two output fields. Its prompt is cached, which is the cheapest way to run it.
+The original prompt was run once, on the 50 dev cases that existed on 2026-10-07. This system's figures are from its last full run that day, three passes over those cases and four added since. `npm run baseline` runs the original prompt the way the packet's Flow section describes: the filled prompt as the system message, all 14 tools in the model's hands, one `Reply` back. It uses the same model and effort as this system's responder, and the same checks, except reason codes, which the original prompt does not have. All it is told about escalation is the packet's own note on the two output fields. Its prompt is cached, which is the cheapest way to run it.
 
 **The original prompt has no escalation path by design, so its score is in two parts.** The 36 cases that need an answer are the like-for-like comparison. The 14 that need a person test a requirement the original prompt was never written for.
 
 | Cases passed | Original prompt | This system |
 | --- | --- | --- |
-| Non-escalation cases, the like-for-like comparison | 29 of 36 | 36 of 36 |
-| Escalation cases, which the original prompt has no path for | 2 of 14 | 14 of 14 |
-| All cases | 31 of 50 | 50 of 50 |
+| Non-escalation cases, the like-for-like comparison | 29 of 36 | 35, 35 and 36 of 36, on three passes |
+| Escalation cases, which the original prompt has no path for | 2 of 14 | 14 of 14 on each pass |
+| All cases | 31 of 50 | 49, 49 and 50 of 50 |
 
 | Per message | Original prompt | This system |
 | --- | --- | --- |
-| Input tokens | about 128,000 | about 15,500 |
-| Model calls, as run | 2.3 on average, 10 at most | 1.7 on average, 4 at most |
+| Input tokens | about 128,000 | about 15,400 |
+| Model calls, as run | 2.3 on average, 10 at most | 1.6 on average, 5 at most |
 | Model calls, the limit | none of its own (the runner stops it at 10) | 7 |
 | Cost, cache warm | $0.034 | $0.011 |
 | Cost, no caching | $0.26 | $0.029 |
-| Latency, p50 and p95 | 4.8 s and 15.6 s | 6.0 s and 9.0 s |
+| Latency, p50 and p95 | 4.8 s and 15.6 s | 6.0 s and 11.0 s |
 
 How to read it:
 
-- **The eval cases are this project's own.** Fourteen of them test escalation, and twelve of the original prompt's 19 misses are those. The dev set has two more cases now, added after these runs. They are not in the tables.
-- **The limit on model calls.** One message makes at most 7 model calls here: the router, the call-history subtask when the call records are long, three responder calls with tools, one more without tools if all three went to tool calls, and one repair. The first two are on the small model. A request that fails and is retried is another attempt at the same call, up to five by default, and is not counted. Each attempt of a router call is given 8 seconds to answer before it is dropped and retried.
+- **The eval cases are this project's own.** Fourteen of them test escalation, and twelve of the original prompt's 19 misses are those. The dev set has four more cases now, added after the original prompt was run. They are not in the first table. The one case this system missed on two passes is the reply that said "No tool gives me one".
+- **The limit on model calls.** One message makes at most 7 model calls here: the router, the call-history subtask when the call records are long, three responder calls with tools, one more without tools if all three went to tool calls, and one repair. The first two are on the small model. A request that fails and is retried is another attempt at the same call, up to five by default, and is not counted. Each attempt of a router call is given 20 seconds to answer before it is dropped and retried.
 - **What the original prompt got wrong on answers.** Five replies left out a link. Two of those are packet messages whose expected replies include it. One reply repeated the last digits of the patient's card back to them. One told the patient "I can't match or confirm a direct quote", the cold refusal the original prompt itself forbids.
 - **What it did on escalations.** It escalated 4 of the 14. Two of those kept answering after the handoff, with figures. One message got no reply at all: the model was still calling tools after ten model calls.
-- **Tokens.** The original prompt and its tool definitions are 60,310 tokens, measured. Every model call reads them again. This system reads about 4,900 tokens in the router and about 14,400 in the responder for an answered message. The original prompt's token and cost figures leave out the one message that got no reply, because the runner did not record a failed call's usage at the time. The real figures are a little higher.
-- **Cost.** A cold start costs this system $0.020 per message, because the first requests write the cache. Without any caching the gap is nine times.
-- **Latency.** The original prompt is faster at the median: a simple question is one model call there and two here. It is slower at the tail, where it loops over tools. A guard escalation here takes about 2 ms, and an escalation the router finds takes about 4 s.
+- **Tokens.** The original prompt and its tool definitions are 60,310 tokens, measured. Every model call reads them again. This system reads about 4,900 tokens in the router and about 14,800 in the responder for an answered message. The original prompt's token and cost figures leave out the one message that got no reply, because the runner did not record a failed call's usage at the time. The real figures are a little higher.
+- **Cost.** The first pass cost this system $0.020 per message, because its requests write the cache. The second and third cost $0.011. Without any caching the gap is nine times.
+- **Latency.** The original prompt is faster at the median: a simple question is one model call there and two here. It is slower at the tail, where it loops over tools. A guard escalation here takes a millisecond or two, and an escalation the router finds takes about 4 s. This system's 95th percentile includes four requests at the start of the run that got no response and were retried. Without those messages it is 10.3 s.
 - **Writes.** In the baseline run the model made 25 write calls on its own judgment, 8 of them to the patient's clinic preferences. Here code does the writing, from ids a tool returned.
 - One run of the baseline. It was not repeated.
 
@@ -239,21 +242,21 @@ The levers, in order of effect:
 1. The guard answers the clearest escalations with no model.
 2. Skills load only when needed.
 3. Code fetches facts, so an answered message is normally one responder call, not one call per tool.
-4. Stable text comes first in the prompt, so prompt caching reads it back at a tenth of the price. Between 54% and 89% of the responder's input was read from cache, depending on how warm the cache was.
+4. Stable text comes first in the prompt, so prompt caching reads it back at a tenth of the price. On the first pass 53% of the responder's input was read from cache, and on the next two 89%.
 5. The router runs on the small model.
 6. The responder runs at low effort. Sonnet 5.5 does not accept a temperature, so effort is its cost and depth control. A run at medium effort passed the same 50 cases with 2% more output tokens and the same latency, so low stays.
 
 ## Trade-offs
 
-- **Two model calls per answered message.** The router adds about 3.7 seconds and half a cent. That makes the median reply slower than the original prompt's, 6.0 s against 4.8 s. In return, the escalation decision and the skill choice are inspectable.
+- **Two model calls per answered message.** The router adds about 3.6 seconds and half a cent. That makes the median reply slower than the original prompt's, 6.0 s against 4.8 s. In return, the escalation decision and the skill choice are inspectable.
 - **The router can pick the wrong skill.** Then the responder lacks a rule. Code softens this: a classification implies skills even when the router does not list them, clinic names are also matched by plain word match, and a missing fact leads to "I don't have that detail", not to a guess.
 - **Validators can cause escalations.** A reply that fails twice goes to a person. The report counts these as avoidable and names the validator.
 - **The router does not always answer the same request the same way.** One request, byte for byte the same, came back with one field different ninety minutes later, and then differed within a single run. It was a message on a boundary, and the field decided whether the reply carried a link. A small edit to the router's prompt did the same to a request for a person. So the router's prompt is treated as fragile: where code can require two of its fields to agree, it does, and a change to the prompt has to earn its place on the whole dev set.
 - **`core` is still 15,000 characters.** It is the next thing to trim.
 - **Verbatim skills keep the original's cross-references.** A skill may mention a section that is not loaded. The frame tells the model that such a section does not apply.
 - **Coverage is self-reported.** It is a signal to watch, not a measurement.
-- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 52 dev cases, `escalate` never flipped. Wording did vary between earlier runs: one reply left out the coordinator's name until a directive fixed it, one said "insurers" where the check then wanted "insurance", and one said a clinic had a package "in the data I have", which a validator now blocks.
-- **The responder can still spend its steps on tools.** The first time, that message went to a person as a system failure. Code now asks again without tools when that happens. It happened once more, in the final run, and that reply passed.
+- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 54 dev cases, `escalate` never flipped. Wording does vary. Each full run of about 160 messages has turned up one slip or none: one reply left out the coordinator's name until a directive fixed it, one said "insurers" where the check then wanted "insurance", one said a clinic had a package "in the data I have", and one said "No tool gives me one". Validators now block the last two.
+- **The responder can still spend its steps on tools.** The first time, that message went to a person as a system failure. Code now asks again without tools when that happens. It has happened twice since, in two full runs, and both replies passed.
 
 ## What I would do next
 
@@ -262,8 +265,8 @@ The levers, in order of effect:
 - **Extract, then check, for the validators that are about meaning.** A small model pulls the claims out of a draft as data, such as whether it says a quote cannot be matched and which prices it states, and code checks those. Today these validators are patterns over prose, and one refusal got past a pattern because it said "that number" where the pattern wanted "that price".
 - **An LLM judge, calibrated on hand-labeled stored replies,** for the eval checks that are about meaning. "A clear no, with no hedging" is a judgment, and a regular expression can only approximate it. The stored traces hold several hundred real replies to label. The judge grades against a rubric, and is trusted only as far as it agrees with the labels. Regular expressions stay for the hard facts: prices, URLs and `escalate`.
 - **A model chosen per intent.** A greeting or a request to resend a link does not need the main model. Each intent would get the cheapest model that still passes its cases, judged by cost per passing reply. Effort is settled for now: medium did not beat low.
-- **Hedged requests for the tail.** When a router call has not answered by about its 95th percentile, send the same request again and take whichever answers first. The 8-second limit only catches the worst cases.
-- **The keep-alive hypothesis for the hung router calls.** A few router requests hung for up to 55 seconds, or got no response at all. They may have gone out on a pooled connection that the other side had already dropped. The test is to turn connection reuse off for the router, or shorten the client's keep-alive time, and see whether the unanswered attempts stop.
+- **Hedged requests for the tail.** When a router call has not answered by about its 95th percentile, send the same request again and take whichever answers first. The 20-second limit only catches the worst cases.
+- **The keep-alive hypothesis for the hung router calls.** A few router requests hung for up to 55 seconds, or got no response at all. They may have gone out on a pooled connection that the other side had already dropped. The test is to turn connection reuse off for the router, or shorten the client's keep-alive time, and see whether the unanswered attempts stop. One observation does not fit: in the last full run the four unanswered attempts were the first four requests the process made, before there was a connection to reuse. That points at setting up a connection, on this machine or network, as much as at reusing one.
 - **The router without its rationale, tested the right way.** It made the router's median call 0.3 seconds faster. It was reverted, because it was part of a run in which a message changed sides, and because one run cannot clear a router change when the router varies on its own. The right test runs both versions on the same messages at the same time and compares them field by field.
 - Trim `core`, and give every request the same tool list so the cached prefix is shared more widely.
 - A second vertical, to test that a new line of care really is only a new folder.
@@ -308,16 +311,16 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 539 unit tests pass.
-- **Dev set, 52 cases, each run three times on the final code.** 52 of 52 passed on every run, the packet's five among them. Every case that should escalate did, none escalated that should not, and `escalate` flipped on 0 of 52 cases. No case's decision, reason code or decider differs from the same run made before the last changes.
-- **Repairs.** 3 of the 114 drafted messages needed a repair, 2.6%. All three were one case, a message that tries to give the system instructions. Before the last changes it was 6 of 114.
-- **Latency by stage, same run.** Router call: p50 3.5 s, p95 4.6 s. Responder call: p50 2.6 s, p95 4.4 s. A message that reached a model: p50 5.9 s, p95 8.5 s.
+- 574 unit tests pass.
+- **Dev set, 54 cases, each run three times on the final code.** 53 of 54 passed on every run, the packet's five among them. Every case that should escalate did, none escalated that should not, and `escalate` flipped on 0 of 54 cases. The one case that did not pass every time is a question the tools cannot answer, the drive from the airport. On two runs the reply said "No tool gives me one". The validator for machinery talk did not know that wording. It does now, and the case then passed five runs of five.
+- **Repairs.** 4 of the 117 drafted messages needed a repair, 3.4%. Three were one case, a message that tries to give the system instructions. Two rounds of changes earlier it was 6 of 114.
+- **Latency by stage, same run.** Router call: p50 3.6 s, p95 5.8 s. Responder call: p50 2.6 s, p95 5.2 s. A message that reached a model: p50 6.0 s, p95 11.0 s. The first four requests of the run got no response and were retried, which cost each of those messages about 14 seconds.
 - **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
 - **The holdout is no longer fully blind.** After its one run its replies were read. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
 - **The text checks are tested too.** The eval's text checks for the four financing and insurance cases are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). For the Medicaid, CareCredit and Cherry cases each check tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject.
 - **Original prompt, on the 50 dev cases that existed then.** 29 of the 36 cases that need an answer, and 2 of the 14 that need a person. See "Cost and speed".
 - **Effort.** Medium passed the same cases as low, at the same latency.
-- **Fresh clone.** Cloned into an empty folder, installed, and run with the command at the top of this file on the packet's five messages: all five replies matched the packet's expected `escalate` and links.
+- **Fresh clone.** Cloned into an empty folder, installed, and run with the command at the top of this file on the packet's five messages: all five replies matched the packet's expected `escalate` and links. That was several changes ago. It is to be run this way once more, on the merged code, before this is handed in.
 
 What the live runs found, and what changed:
 
@@ -328,18 +331,21 @@ What the live runs found, and what changed:
 | A holdout reply said "The tool shows", and two dev replies said a clinic had a package "in my data" | The internal-vocabulary validator blocks both, and the eval fails any reply that talks about the machinery. |
 | The check for one case demanded the word "insurance" and failed a correct reply. The looser check that replaced it passed a wrong one | The eval can now check the first sentence, and ban a word inside sentences about one subject. Four cases have checks rewritten this way, with unit tests. `--recheck` re-scored every stored run. |
 | In a fresh clone, `npm test` failed after the README's command had written `replies.json`: the leak test read that file as source | The leak test reads only files that are in the repository or could be added to it. |
-| To a patient who passed on a clinic's quote, the first draft refused to match it on every run, and only a repair got the reply out | The `outsidePrice` directive. On that message the validator has not fired in the six runs since. It stays as the safety net. |
+| To a patient who passed on a clinic's quote, the first draft refused to match it on every run, and only a repair got the reply out | The `outsidePrice` directive. On that message the validator has not fired in the nine runs since. It stays as the safety net. |
 | A router field added for that directive changed how the router read a request for a person: it was answered, three runs of three | The field was taken out, and the router's prompt and schema are what they were. Code reads the same thing off the router's existing output. |
 | The router answered one unchanged request two ways. Asked what a package and its deposit cost, it sometimes marked the message as being about paying, and the reply carried a payment link | The planner adds a link for a self-serve step only when the router also lists the step's intent. |
 | Without its rationale, the router's median call was 0.3 s faster and its p95 0.7 s faster | Reverted. It was part of the run in which a message changed sides. See "What I would do next". |
-| Some router requests hung, one for 55 seconds, and others got no response and were retried only after about ten seconds | Each model call records its failed attempts, and each attempt of a router call gets 8 seconds before it is dropped and retried. |
+| Some router requests hung, one for 55 seconds, and others got no response and were retried only after ten seconds or more | Each model call records its failed attempts, and each attempt of a router call gets 20 seconds before it is dropped and retried. |
+| The guard took "Do I need to talk to a person before paying?" for a request for a person, and left "Can I talk to someone about this?" to the router | A question about whether a person is needed is no longer a request. The guard decides the plain ways of asking for someone, and a test holds it to every eval case. |
+| A reply said "No tool gives me one" | The validator blocks the word "tool" outside a sentence about surgery. |
 
 What is not verified:
 
-- **The 8-second limit has unit tests only.** No request hung in the final run: 0 retries in 259 model calls. Of 447 healthy router calls recorded earlier, 6 took longer than 8 seconds, so about one call in a hundred will be cut off and retried. The first router calls after its schema last changed took 7.0 seconds, a second under the limit.
+- **The limit on a router attempt has unit tests only.** It is 20 seconds, and no attempt has reached it. It was 8 at first. That was raised because the first router calls after its output schema changed took 7 seconds, and anyone who runs this with their own key starts there.
 - **Stability across days is not measured.** The stability run shows that `escalate` does not flip within one run. It does not show that the router reads a message the same way tomorrow. One field of one message did change between two sessions.
-- **The fallback for a responder that runs out of steps has fired once in a live run.** That reply passed. One occurrence is not a rate.
-- **The hung router calls are not explained.** Three calls that were retried each lost about ten seconds to an attempt with no response. That matches the slow calls of the early runs, which recorded no retries. Why the requests fail is not known.
+- **The fallback for a responder that runs out of steps has fired twice in live runs.** Both replies passed. Two occurrences are not a rate.
+- **The requests that get no response are not explained.** In the last full run they were the first four requests the process made, and each lost about 14 seconds before its retry. Earlier ones lost about 10. Why they fail is not known. They may be particular to this machine or network.
+- **Wording still slips.** Each full run of about 160 messages has turned up one reply that says something it should not, or none. Each one found so far now has a validator rule. The next one has not been found yet.
 - The holdout checks are light. Most test the escalation decision and the links, not every sentence.
 - The baseline ran once.
 - The stage skills other than `PRE_CLINICAL_SENT` and the intake rules are ported but have no eval coverage, because the packet fixes the patient's stage.

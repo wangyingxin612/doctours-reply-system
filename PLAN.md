@@ -394,7 +394,7 @@ All accepted in review.
 | M4 Remaining skills | Done. 26 skills, every one built by `scripts/split-prompt.ts`. |
 | M5 Full router and planner | Done. |
 | M6 Remaining validators and failure handling | Done. Eleven validators. |
-| M7 Eval and tuning | Done. 52 dev cases and 15 holdout cases. On the final code, with each dev case run three times, 52 of 52 passed on every run and `escalate` flipped on 0 of 52. The holdout ran once: 15 of 15 as scored that day. Medium effort did not beat low. |
+| M7 Eval and tuning | Done. 54 dev cases and 15 holdout cases. On the final code, with each dev case run three times, 53 of 54 passed on every run and `escalate` flipped on 0 of 54. The holdout ran once: 15 of 15 as scored that day. Medium effort did not beat low. |
 | M8 Monday report | Done, and run on real traces. |
 | M9 README and wrap-up | Done. The full baseline ran once (`npm run baseline`): the original prompt passed 31 of the 50 dev cases. The static size comparison (`npm run size`) is kept. |
 | M10 Unreachable stages | Done. No eval coverage, as planned. |
@@ -429,5 +429,6 @@ What the owner's review of those changes added:
 - A directive, `outsidePrice`, for a message that passes on a price from somewhere else, such as a clinic's direct quote. Before it, the first draft told the patient the quote could not be matched on every run, and only the validator and a repair got the reply out. The owner asked for a router field to trigger it. The field worked, but with it the router stopped reading one request for a person as one. So the field was taken out, and code reads the trigger off what the router already says.
 - The planner acts on a self-serve step only when the router also lists the step's intent. The router answered one unchanged request two ways, and one of them added a payment link nobody asked for.
 - The router's prompt is treated as fragile. Two small edits to it each coincided with a message being read differently, and the router also varies with no edit at all. Removing its rationale made the median call 0.3 seconds faster and was reverted under the rule the owner set for the experiment: revert if any message changes sides.
-- Each attempt of a router call has 8 seconds to answer before it is dropped and retried.
+- Each attempt of a router call has 20 seconds to answer before it is dropped and retried. It was 8 at first, which was too close to the 7 seconds the first calls take after the router's schema changes.
+- The guard decides the plain ways of asking for someone, such as "Can I talk to someone about this?", which used to be left to the router. It also stops taking "Do I need to talk to a person before paying?" for a request. This changes the brief's "leave anything ambiguous to the router" only for wordings that are not ambiguous, and the owner agreed to it.
 - The Monday report gives repairs by validator and by intent, and latency for each stage.
