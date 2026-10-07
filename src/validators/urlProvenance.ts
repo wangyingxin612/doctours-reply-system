@@ -19,6 +19,11 @@ export const urlProvenance: Validator = (reply, context) => {
     }
   }
 
+  const payLinks = new Set(inResponse.filter((url) => /\/payment\/|\/checkout(?:[/?#]|$)/.test(url)));
+  if (payLinks.size > 1) {
+    add("The reply carries more than one payment or checkout link. Send exactly one.");
+  }
+
   const present = new Set(inResponse);
   for (const url of context.requiredUrls) {
     if (!present.has(url)) add(`The reply must end with this link, alone on the last line: ${url}`);
