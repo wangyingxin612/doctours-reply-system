@@ -26,15 +26,19 @@ requestedActions: things the patient asks us to do now. Give one entry per actio
 selfServe: steps the patient can complete on their own on a Doctours page. List a step whenever the message asks anything about that step: how to do it, where, whether they can, how it works, or what it costs.
 - pay_deposit: how, where or whether they can pay or book the deposit, including paying from their assessment, and what the next step toward booking is.
 - book_consultation: anything about the free consultation call itself, such as its cost, its format, who it is with, or how to book it.
+- upload_photos: how or where to upload intake photos, or sending more photos.
 Use an empty list when the message is about something else.
 
 entities:
 - clinics: the clinics the message is about. Use the exact name from the clinic flags when the patient means one of those clinics, including by a short form or by a pronoun the conversation makes clear. Otherwise use the patient's own wording.
 - packages: package names the patient mentions.
 - clinicLean: "selected" when the patient chooses one clinic or leans toward it, with any clear positive signal for that clinic. "torn" when they are undecided between two or more clinics with no lean. Otherwise null.
-- statedTiming: timing for the procedure that the patient states in this message, in their words. Otherwise null.
+- packageLean: "selected" when the patient chooses one package or leans toward it. "torn" when they are undecided between two or more packages. Otherwise null. Asking about a package is not choosing it.
+- statedTiming: a month, season, date or date range for the procedure that the patient states in this message. Give the text in their words and a strength: "strong" for a definite commitment, "medium" for active consideration, "weak" for an exploratory or uncertain mention. Use null when the message states no such timing. A relative window such as "in the next few months" is not a stated timing, and neither is a time the patient wants for a consultation call.
 - statedName: the patient's name, if they state it in this message. Otherwise null.
-- linksRequested: links the patient asks us to send, in so many words ("send me the link", "what's the URL", "can you resend it"). Asking whether or how they can do something is not a request for a link.
+- linksRequested: links the patient asks us to send, in so many words ("send me the link", "what's the URL", "can you resend it"). A request for a clinic's website or page is clinic_page. Asking whether or how they can do something is not a request for a link.
+
+needsCallHistory: true when answering needs what was said on a phone call with us, for example when the patient refers to something discussed on a call. Otherwise false.
 
 rationale: one sentence on why you chose the primary intent and any actions.
 

@@ -128,6 +128,7 @@ export const TOOL_REGISTRY = {
     description: "Saves clinic and package selection and tentative procedure dates.",
     inputSchema: z.object({
       clinicSelection: z.record(z.string(), z.unknown()).optional(),
+      tentativeProcedureDates: z.object({ text: z.string(), strength: z.string() }).optional(),
       userId: z.string().optional(),
     }),
     run: packet.updateUserClinicPreferences,

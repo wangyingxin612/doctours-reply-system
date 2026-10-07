@@ -39,13 +39,16 @@ export const INTENTS = [
 export type Intent = (typeof INTENTS)[number];
 
 /** Steps a patient can complete alone on a known page. See the link rule in the planner. */
-export const SELF_SERVE_STEPS = ["pay_deposit", "book_consultation"] as const;
+export const SELF_SERVE_STEPS = ["pay_deposit", "book_consultation", "upload_photos"] as const;
 export type SelfServeStep = (typeof SELF_SERVE_STEPS)[number];
 
 export const LINK_KINDS = ["assessment", "payment", "consultation", "photo_upload", "clinic_page"] as const;
 export type LinkKind = (typeof LINK_KINDS)[number];
 
 export const REQUEST_TYPES = ["question", "action", "mixed", "pause", "chit_chat"] as const;
+
+/** How committed the patient sounds about a stated month, season or date. */
+export const TIMING_STRENGTHS = ["strong", "medium", "weak"] as const;
 
 function routerSchema(skillNames: readonly string[]) {
   const [first, ...rest] = skillNames;
@@ -68,10 +71,12 @@ function routerSchema(skillNames: readonly string[]) {
       clinics: z.array(z.string()),
       packages: z.array(z.string()),
       clinicLean: z.enum(["selected", "torn"]).nullable(),
-      statedTiming: z.string().nullable(),
+      packageLean: z.enum(["selected", "torn"]).nullable(),
+      statedTiming: z.object({ text: z.string(), strength: z.enum(TIMING_STRENGTHS) }).nullable(),
       statedName: z.string().nullable(),
       linksRequested: z.array(z.enum(LINK_KINDS)),
     }),
+    needsCallHistory: z.boolean(),
     rationale: z.string(),
     confidence: z.enum(["high", "low"]),
   });
