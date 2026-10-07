@@ -12,7 +12,7 @@ import { noCardEcho } from "../validators/noCardEcho";
 import { shape } from "../validators/shape";
 import { EMPTY_VALIDATION_CONTEXT } from "../validators/types";
 import { isFatal, toFailure, toFatal } from "./errors";
-import { runGuard, type GuardResult, type Redaction, type RedactionType } from "./guard";
+import { GUARD_INTENT, runGuard, type GuardReasonCode, type GuardResult, type Redaction, type RedactionType } from "./guard";
 
 /** What the model stages add to the trace while they work. */
 export interface TurnRecord {
@@ -97,6 +97,7 @@ async function decideAndAnswer(input: AnswerInput, answer: AnswerStage | undefin
   if (input.guard.hits.length > 0) {
     // Decided without a model: no router call, no prefetch, no side effects.
     const decision = decideFromGuard(input.guard.hits);
+    input.record.primaryIntent = GUARD_INTENT[decision.reasonCode as GuardReasonCode] ?? null;
     return { reply: buildEscalationReply(decision.reasonCode ?? "SYSTEM_FAILURE"), decision, failure: null };
   }
   try {

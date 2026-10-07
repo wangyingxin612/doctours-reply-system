@@ -12,6 +12,12 @@ export interface Redaction {
 
 export type GuardReasonCode = "HUMAN_REQUESTED" | "PAYMENT_ACTION_NO_TOOL";
 
+/** A guard decision never reaches the router, so its intent for the report follows from its code. */
+export const GUARD_INTENT: Record<GuardReasonCode, string> = {
+  HUMAN_REQUESTED: "human_request",
+  PAYMENT_ACTION_NO_TOOL: "payment",
+};
+
 export interface GuardHit {
   reasonCode: GuardReasonCode;
   rule: string;
