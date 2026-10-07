@@ -26,11 +26,11 @@ Opened and closed on 2026-10-07. You added credit, and I ran everything that was
 | --- | --- |
 | `npm run smoke` | All four live checks passed. |
 | `npm run eval -- --split dev --run-id after-fixes` | 49 of 50. The three earlier failures were fixed. One new failure: the responder ran out of steps. Fixed. |
-| `npm run eval -- --split dev --repeat 3 --run-id stability` | 49 of 50 on every run. `escalate` flipped on 0 of 50 cases. The one failure was the identity reply. Fixed. |
+| `npm run eval -- --split dev --repeat 3 --run-id stability` | 49 of 50 on every run. `escalate` flipped on 0 of 50 cases. The one failure was the identity reply. Fixed. Under the machinery check added later, one more case fails one run of three. Not re-run on the final code. |
 | `npm run eval -- --split dev --run-id dev-final` | 50 of 50. |
 | `RESPONDER_EFFORT=medium npm run eval -- --split dev --run-id effort-medium` | 50 of 50, with 2% more output tokens and the same latency as low. Low stays the default. |
 | `npm run baseline -- --split dev --run-id baseline-dev` | The original prompt: 31 of 50, and 2 of the 14 escalation cases. |
-| `npm run eval -- --split holdout --run-id holdout` | 15 of 15, run once. |
+| `npm run eval -- --split holdout --run-id holdout` | 15 of 15, run once. Its replies were read afterwards, so it is no longer blind. Under the machinery check added after that, the same run scores 14 of 15. |
 | `npm run eval -- --split dev --run-id dev-verified` | The final code: 50 of 50 after the `medicaid` check was corrected, 49 as first scored. |
 
 The README's "Verification status" and "Cost and speed" sections have the details.

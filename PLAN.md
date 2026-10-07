@@ -418,7 +418,7 @@ What the live runs after the top-up changed:
 - The responder gets one more model call, with no tools, when it spends its three calls on tool calls. The brief's "one repair, then a person" did not cover a draft that never arrives. Without this, such a message is a false escalation caused by the system.
 - A tool whose one possible result code already fetched is not offered to the model.
 - A directive, `identityQuestion`, carries the router's label to the responder, so the original prompt's identity rule, name and role, is applied when the patient asks whether they are talking to a bot.
-- The internal-vocabulary validator also blocks talk about the machinery, such as "the tool shows".
+- The internal-vocabulary validator also blocks talk about the machinery, such as "the tool shows". The eval fails any reply that does it, on every case, with a check of its own. Both came from reading the holdout replies after their one run, so the holdout is no longer blind.
 - Each model call in a trace records the HTTP status of every attempt that failed and was retried.
 - `npm run eval -- --recheck <runDir>` scores a past run again from its traces, with no model call.
 - `npm run baseline` exists and has run. Its output schema makes the working-memory fields optional and not nullable, because the API accepts at most 16 nullable fields in one schema.
