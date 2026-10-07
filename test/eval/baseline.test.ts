@@ -24,6 +24,7 @@ const config: ModelConfig = {
   responderModel: "mock-responder",
   responderEffort: "medium",
   maxRetries: 0,
+  routerAttemptTimeoutMs: 0,
   responderFallbacks: false,
 };
 

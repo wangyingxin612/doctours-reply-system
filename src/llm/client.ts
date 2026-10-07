@@ -38,6 +38,11 @@ export interface LlmRequest<T> {
   /** Model calls allowed, counting the final structured answer. 3 means at most two tool rounds. */
   maxSteps?: number;
   maxOutputTokens?: number;
+  /**
+   * How long one HTTP attempt may wait for a response, in milliseconds. An attempt that runs out is
+   * dropped and retried like a lost connection. Leave it out, or give 0, for no limit of ours.
+   */
+  attemptTimeoutMs?: number;
 }
 
 export interface LlmUsage {
@@ -119,19 +124,39 @@ const DEFAULT_MAX_OUTPUT_TOKENS: Record<LlmRole, number> = {
   responder: 8000,
 };
 
-/** Failed HTTP attempts of the call in progress. The SDK retries inside one call and reports none of it. */
-const failedAttemptLog = new AsyncLocalStorage<number[]>();
+/** What the fetch wrapper knows about the model call in progress. */
+interface CallContext {
+  /** The SDK retries inside one call and reports none of it, so each failed attempt is noted here. */
+  failedAttempts: number[];
+  attemptTimeoutMs: number | undefined;
+}
 
-/** fetch, with every failed attempt noted, so a slow call can be told apart from a retried one. */
+const callContext = new AsyncLocalStorage<CallContext>();
+
+/**
+ * fetch, with two additions. Every failed attempt is noted, so a slow call can be told apart from
+ * a retried one. And an attempt may be given a time limit: when it runs out, the attempt fails the
+ * way a lost connection does, which the SDK retries. The limit covers the wait for the response to
+ * start. For these calls, which do not stream, that is nearly all of the call.
+ */
 const recordingFetch: typeof fetch = async (input, init) => {
-  const failed = failedAttemptLog.getStore();
+  const context = callContext.getStore();
+  const limit = context?.attemptTimeoutMs;
+  const ours = limit ? new AbortController() : null;
+  const timer = ours ? setTimeout(() => ours.abort(), limit) : null;
+  const signal = ours ? (init?.signal ? AbortSignal.any([init.signal, ours.signal]) : ours.signal) : init?.signal;
   try {
-    const response = await fetch(input, init);
-    if (!response.ok) failed?.push(response.status);
+    const response = await fetch(input, signal ? { ...init, signal } : init);
+    if (!response.ok) context?.failedAttempts.push(response.status);
     return response;
   } catch (error) {
-    failed?.push(0);
+    context?.failedAttempts.push(0);
+    if (ours?.signal.aborted && !init?.signal?.aborted) {
+      throw new TypeError("fetch failed", { cause: new Error(`No response within ${limit} ms.`) });
+    }
     throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 };
 
@@ -219,7 +244,7 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
         : {};
 
     const failedAttempts: number[] = [];
-    const result = await failedAttemptLog.run(failedAttempts, () =>
+    const result = await callContext.run({ failedAttempts, attemptTimeoutMs: request.attemptTimeoutMs || undefined }, () =>
       generateText({
         model,
         instructions: toInstructions(request.system),

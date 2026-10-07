@@ -10,6 +10,12 @@ export interface ModelConfig {
   /** Retries for transient API errors (429, 5xx, overloaded, network), with exponential backoff. */
   maxRetries: number;
   /**
+   * How long one HTTP attempt of a router call may wait for a response, in milliseconds. After that
+   * the attempt is dropped and retried. A healthy router call answers in about 4 seconds, and a
+   * request that hangs has been seen to take 55. 0 turns the limit off.
+   */
+  routerAttemptTimeoutMs: number;
+  /**
    * Server-side refusal fallback, a beta feature. When on, some refused requests are retried on an
    * earlier model by the API. Off unless RESPONDER_FALLBACKS=default.
    */
@@ -18,6 +24,7 @@ export interface ModelConfig {
 
 export const DEFAULT_ROUTER_MODEL = "claude-haiku-4-5-20251001";
 export const DEFAULT_RESPONDER_MODEL = "claude-sonnet-5-5";
+export const DEFAULT_ROUTER_ATTEMPT_TIMEOUT_MS = 8000;
 
 function effortFromEnv(value: string | undefined): Effort {
   const effort = value?.trim().toLowerCase();
@@ -46,6 +53,7 @@ export function loadModelConfig(env: NodeJS.ProcessEnv = process.env): ModelConf
     responderModel: env.RESPONDER_MODEL?.trim() || DEFAULT_RESPONDER_MODEL,
     responderEffort: effortFromEnv(env.RESPONDER_EFFORT),
     maxRetries: countFromEnv("LLM_MAX_RETRIES", env.LLM_MAX_RETRIES, 5),
+    routerAttemptTimeoutMs: countFromEnv("ROUTER_ATTEMPT_TIMEOUT_MS", env.ROUTER_ATTEMPT_TIMEOUT_MS, DEFAULT_ROUTER_ATTEMPT_TIMEOUT_MS),
     responderFallbacks: fallbacksFromEnv(env.RESPONDER_FALLBACKS),
   };
 }

@@ -10,6 +10,7 @@ const config: ModelConfig = {
   responderModel: "mock-responder",
   responderEffort: "low",
   maxRetries: 0,
+  routerAttemptTimeoutMs: 0,
   responderFallbacks: false,
 };
 
@@ -357,6 +358,67 @@ describe("callModel over HTTP", () => {
 
     expect((await pending).failedAttempts).toEqual([0]);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops an attempt that gets no response within its limit, and retries it", async () => {
+    // The first attempt never answers. It ends only when its signal is aborted.
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => reject(new DOMException("This operation was aborted", "AbortError")));
+          }),
+      )
+      .mockImplementationOnce(async () => answered());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = callModel({ ...request("router"), attemptTimeoutMs: 8000 }, { config: live });
+    await vi.advanceTimersByTimeAsync(7_999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    const result = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.output).toEqual({ answer: "hi" });
+    // Noted the same way as a lost connection: an attempt that got no response.
+    expect(result.failedAttempts).toEqual([0]);
+  });
+
+  it("gives up as a transient failure when every attempt runs out of time", async () => {
+    const hang: typeof fetch = (_input, init) =>
+      new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => reject(new DOMException("This operation was aborted", "AbortError")));
+      });
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation(hang);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = failure(callModel({ ...request("router"), attemptTimeoutMs: 8000 }, { config: { ...live, maxRetries: 2 } }));
+    await vi.advanceTimersByTimeAsync(120_000);
+    const error = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(error.failureCause).toBe("transient_api");
+  });
+
+  it("puts no limit on a call that was not given one", async () => {
+    let answer!: (response: Response) => void;
+    const fetchMock = vi.fn<typeof fetch>().mockImplementationOnce(
+      (_input, init) =>
+        new Promise<Response>((resolve, reject) => {
+          answer = resolve;
+          init?.signal?.addEventListener("abort", () => reject(new DOMException("This operation was aborted", "AbortError")));
+        }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const pending = callModel(request("responder"), { config: live });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    answer(answered());
+    expect((await pending).failedAttempts).toEqual([]);
   });
 
   it("stops at once on an empty account, without retrying", async () => {

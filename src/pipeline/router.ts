@@ -119,6 +119,7 @@ export async function runRouter(input: RouterInput, deps: LlmDeps = {}): Promise
       system: [{ text: routerSystemPrompt(input.skills) }],
       prompt: `${routerSnapshot(input.context)}\n\n# Incoming message\n"${input.text}"`,
       schema: routerSchema(input.skills.routable.map((skill) => skill.name)),
+      attemptTimeoutMs: input.config.routerAttemptTimeoutMs,
     },
     { config: input.config, ...deps },
   );
