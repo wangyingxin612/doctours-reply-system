@@ -8,9 +8,10 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "respond": "tsx src/cli/respond.ts",
+    "smoke": "tsx scripts/smoke.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
-    "smoke": "tsx scripts/smoke.ts"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.74",
