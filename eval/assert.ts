@@ -1,4 +1,7 @@
 // Checks one reply against one eval case. Facts and rules are checked, never wording.
+// A text check is a regular expression, so it can test where a thing is said and what must not be
+// said near it. It cannot test what a sentence means. test/eval/textChecks.test.ts runs the checks
+// of the cases that lean on them against replies known to be good and replies known to be bad.
 
 import { z } from "zod";
 import { replySchema, type Reply } from "../src/schema/reply";
@@ -30,6 +33,16 @@ export const caseSchema = z.strictObject({
     mustMatch: z.array(z.string()).optional(),
     /** Regular expressions, case-insensitive. None may match the response. */
     mustNotMatch: z.array(z.string()).optional(),
+    /**
+     * Regular expressions, case-insensitive. Every one must match the first sentence of the response.
+     * For a rule that says what comes first, such as "the no first, then what we do offer".
+     */
+    firstSentenceMatch: z.array(z.string()).optional(),
+    /**
+     * No sentence that matches `about` may also match `pattern`. For a word that is wrong only in
+     * one context, such as "might" in a sentence about insurance.
+     */
+    mustNotMatchInSentence: z.array(z.strictObject({ about: z.string(), pattern: z.string() })).optional(),
     /** The exact set of URLs the response must contain. An empty list means no URL at all. */
     urls: z.array(z.string()).optional(),
   }),
@@ -54,8 +67,32 @@ export interface CaseResult {
  */
 const MACHINERY_TALK = /\b(?:tools?|database|system prompt|my data|the data I have)\b/i;
 
+/** A curly apostrophe means the same as a straight one. Patterns are written with the straight one. */
+function straightApostrophes(text: string): string {
+  return text.replace(/[\u2018\u2019\u02BC]/g, "'");
+}
+
+/** Words that end in a period without ending a sentence. "Dr." is in most replies here. */
+const ABBREVIATION = /\b(?:Dr|Mr|Mrs|Ms|Prof|vs|e\.g|i\.e|U\.S)\.$/i;
+
+/** The sentences of a reply. A line break ends a sentence. A period after "Dr" does not. */
+export function sentencesOf(text: string): string[] {
+  const sentences: string[] = [];
+  for (const line of text.split(/\n+/)) {
+    let current = "";
+    for (const piece of line.split(/(?<=[.!?])\s+/)) {
+      current = current === "" ? piece : `${current} ${piece}`;
+      if (ABBREVIATION.test(current)) continue;
+      sentences.push(current.trim());
+      current = "";
+    }
+    sentences.push(current.trim());
+  }
+  return sentences.filter((sentence) => sentence !== "");
+}
+
 function sentenceCount(text: string): number {
-  return text.split(/(?<=[.!?])\s+/).filter(Boolean).length;
+  return sentencesOf(text).length;
 }
 
 /** What a check reads about how a reply was produced. A pipeline trace has both fields. */
@@ -87,11 +124,23 @@ export function checkCase(testCase: EvalCase, reply: Reply, trace: Produced): Ca
   // A failure that happens to land on the expected side of escalate is still a failure of the system.
   if (trace.failure !== null) failures.push(`pipeline failure: ${trace.failure.cause}: ${trace.failure.detail}`);
 
+  const text = straightApostrophes(response);
+  const sentences = sentencesOf(text);
+  const matches = (pattern: string, subject: string) => new RegExp(pattern, "i").test(subject);
+
+  for (const pattern of expect.firstSentenceMatch ?? []) {
+    if (!matches(pattern, sentences[0] ?? "")) failures.push(`first sentence is missing: /${pattern}/`);
+  }
   for (const pattern of expect.mustMatch ?? []) {
-    if (!new RegExp(pattern, "i").test(response)) failures.push(`missing: /${pattern}/`);
+    if (!matches(pattern, text)) failures.push(`missing: /${pattern}/`);
   }
   for (const pattern of expect.mustNotMatch ?? []) {
-    if (new RegExp(pattern, "i").test(response)) failures.push(`must not appear: /${pattern}/`);
+    if (matches(pattern, text)) failures.push(`must not appear: /${pattern}/`);
+  }
+  for (const { about, pattern } of expect.mustNotMatchInSentence ?? []) {
+    if (sentences.some((sentence) => matches(about, sentence) && matches(pattern, sentence))) {
+      failures.push(`must not appear in a sentence about /${about}/: /${pattern}/`);
+    }
   }
 
   if (expect.urls !== undefined) {

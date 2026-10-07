@@ -651,16 +651,29 @@
       "insurance"
     ],
     "text": "Does Medicaid pay for a hair transplant?",
-    "note": "The first pattern checks the fact that Medicaid cannot pay, in any usual wording. It used to require the word 'insurance', and failed a correct reply that said 'insurers'.",
+    "note": "Checks the shape the HEALTH INSURANCE rule asks for: the no first, then financing and layaway, and no hedge. The checks are run against known good and bad replies in test/eval/textChecks.test.ts.",
     "expect": {
       "escalate": false,
+      "firstSentenceMatch": [
+        "can't|cannot|isn't|aren't|doesn't|don't|won't|not able|unable",
+        "insurance|insurer|medicaid|medicare|covered|coverage"
+      ],
       "mustMatch": [
-        "can(no|')t (use|be used)|cash-pay|do(n't| not) (bill|accept|take)|(is|are)(n't| not) (covered|accepted)|does(n't| not) (pay|cover)",
-        "financing|layaway"
+        "klarna|paypal|financing",
+        "layaway"
       ],
       "mustNotMatch": [
-        "depends on your plan",
-        "submit a claim"
+        "depends on (your|the) plan",
+        "reimburs",
+        "submit (a|your) claim",
+        "medically necessary",
+        "superbill"
+      ],
+      "mustNotMatchInSentence": [
+        {
+          "about": "insur|medicaid|medicare",
+          "pattern": "\\b(may|might|could)\\b"
+        }
       ]
     }
   },
@@ -672,11 +685,26 @@
       "financing"
     ],
     "text": "Do you take CareCredit?",
+    "note": "Checks the shape the CARECREDIT rule asks for: the no first, naming the product, then our own financing and layaway, and no hedge. \"Financing\" alone does not count as naming ours, because a reply can say \"CareCredit financing\".",
     "expect": {
       "escalate": false,
+      "firstSentenceMatch": [
+        "can't|cannot|isn't|aren't|doesn't|don't|won't|not able|unable",
+        "care ?credit"
+      ],
       "mustMatch": [
-        "(don't|do not) accept CareCredit",
-        "klarna|paypal|layaway"
+        "klarna|paypal|(our|own) financing",
+        "layaway"
+      ],
+      "mustNotMatch": [
+        "if the clinic",
+        "try applying"
+      ],
+      "mustNotMatchInSentence": [
+        {
+          "about": "care ?credit",
+          "pattern": "\\b(may|might|could|depends)\\b"
+        }
       ]
     }
   },
@@ -1108,12 +1136,26 @@
       "financing"
     ],
     "text": "Does Cherry financing work with you guys?",
-    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it.",
+    "note": "Holdout. Written after tuning. Run once, on 2026-10-07, and its replies were read afterwards, so it is no longer blind. Do not tune on it. Its text checks were rewritten on review, after that run, to check the shape the CARECREDIT rule asks for.",
     "expect": {
       "escalate": false,
+      "firstSentenceMatch": [
+        "can't|cannot|isn't|aren't|doesn't|don't|won't|not able|unable",
+        "cherry"
+      ],
       "mustMatch": [
-        "(don't|do not) accept Cherry",
-        "klarna|paypal|layaway"
+        "klarna|paypal|(our|own) financing",
+        "layaway"
+      ],
+      "mustNotMatch": [
+        "if the clinic",
+        "try applying"
+      ],
+      "mustNotMatchInSentence": [
+        {
+          "about": "cherry",
+          "pattern": "\\b(may|might|could|depends)\\b"
+        }
       ]
     }
   },

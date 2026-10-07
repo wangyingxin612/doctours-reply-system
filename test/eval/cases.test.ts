@@ -22,11 +22,25 @@ describe("eval cases", () => {
     expect(cases.filter((testCase) => testCase.source === "packet")).toHaveLength(5);
   });
 
+  /** Every regular expression a case uses, whichever kind of check it is in. */
+  const patternsOf = ({ expect: checks }: (typeof cases)[number]) => [
+    ...(checks.mustMatch ?? []),
+    ...(checks.mustNotMatch ?? []),
+    ...(checks.firstSentenceMatch ?? []),
+    ...(checks.mustNotMatchInSentence ?? []).flatMap(({ about, pattern }) => [about, pattern]),
+  ];
+
   it("use patterns that compile", () => {
     for (const testCase of cases) {
-      for (const pattern of [...(testCase.expect.mustMatch ?? []), ...(testCase.expect.mustNotMatch ?? [])]) {
+      for (const pattern of patternsOf(testCase)) {
         expect(() => new RegExp(pattern, "i"), `${testCase.id}: /${pattern}/`).not.toThrow();
       }
+    }
+  });
+
+  it("write apostrophes straight, because a reply's curly ones are made straight before matching", () => {
+    for (const testCase of cases) {
+      for (const pattern of patternsOf(testCase)) expect(pattern, testCase.id).not.toMatch(/[\u2018\u2019\u02BC]/);
     }
   });
 
@@ -41,6 +55,7 @@ describe("eval cases", () => {
   it("ask for no wording and no link from an escalation, which is one fixed sentence", () => {
     for (const testCase of cases.filter((candidate) => candidate.expect.escalate)) {
       expect(testCase.expect.mustMatch ?? [], testCase.id).toEqual([]);
+      expect(testCase.expect.firstSentenceMatch ?? [], testCase.id).toEqual([]);
       expect(testCase.expect.urls ?? [], testCase.id).toEqual([]);
     }
   });
