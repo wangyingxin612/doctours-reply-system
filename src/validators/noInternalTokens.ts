@@ -31,11 +31,15 @@ const NAMES = [
 ];
 const KNOWN_NAME = new RegExp(String.raw`(?<![\w])(?:${NAMES.map((name) => name.replace(/[.]/g, String.raw`\.`)).join("|")})(?![\w])`, "i");
 
+/** Talk about the machinery behind the reply: "the tool shows", "in my data". The rules say "tool" often, and the model echoes it. */
+const MACHINERY =
+  /\b(?:(?:the|my|our) tools?\s+(?:shows?|says?|lists?|returns?|returned|gives?|gave|has|have|only|does(?:n't| not)|do(?:n't| not))\b|tool (?:results?|calls?|outputs?)\b|according to (?:the|my|our) (?:tools?|data|system)\b|in (?:my|our) data\b|(?:the|my) data I have\b)/i;
+
 /** The reply must read as a person's text message: no ids, tool names, field names, status labels or reason codes. */
 export const noInternalTokens: Validator = (reply) => {
   // URLs legitimately contain ids, so they are set aside first.
   const prose = reply.response.replace(/\b(?:https?:\/\/|www\.)\S+/gi, " ");
-  const found = [UUID, SNAKE_CASE, KNOWN_NAME].map((pattern) => pattern.exec(prose)?.[0]).filter(Boolean);
+  const found = [UUID, SNAKE_CASE, KNOWN_NAME, MACHINERY].map((pattern) => pattern.exec(prose)?.[0]).filter(Boolean);
   return found.length > 0
     ? [
         {

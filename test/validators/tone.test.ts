@@ -127,6 +127,11 @@ describe("no_internal_tokens", () => {
     "The aiContext says the doctor draws the hairline.",
     "Your id is 7c2e1a40-6b8f-4d3a-9e15-2f0a8b6c4d11.",
     "That falls under PRICE_NEGOTIATION.",
+    "The tool shows 3 hotel nights included.",
+    "My tools don't list a nightly rate for that hotel.",
+    "The clinic has one package in my data, at 3,200 USD.",
+    "The clinic has one package in the data I have.",
+    "According to the system, your photos are in.",
   ])("blocks: %s", (response) => {
     expect(noInternalTokens(reply(response), context)).toHaveLength(1);
   });
@@ -137,6 +142,9 @@ describe("no_internal_tokens", () => {
     "Layaway is interest-free and has no application.",
     "You can reach her at molly@doctours.com.",
     "Silver books Mon, Tue, Thu and Fri.",
+    "I don't have that detail for Silver. It lists 3 hotel nights as included.",
+    "The doctor uses fine tools for the hairline incisions.",
+    "Your data stays with Doctours and the clinic you choose.",
   ])("passes ordinary text, and ids inside a link: %s", (response) => {
     expect(noInternalTokens(reply(response), context)).toEqual([]);
   });
