@@ -241,6 +241,39 @@ describe("planner: the link rule", () => {
   });
 });
 
+describe("planner: other stages", () => {
+  const base = buildPacketContext();
+  const newLead: PatientContext = {
+    ...base,
+    pipelineStatus: "LEAD",
+    procedure: { ...base.procedure, area: null },
+    images: { hasImages: false, count: 0 },
+    workingMemory: {},
+  };
+
+  it("loads the stage skill that matches the pipeline status", () => {
+    const statuses = ["LEAD", "PREP_PRE_CLINICAL", "MEETING_BOOKED", "MEETING_COMPLETED", "MEETING_MISSED", "WAITING"];
+    for (const pipelineStatus of statuses) {
+      const { plan: built } = plan(routed(), "hi", { ...base, pipelineStatus });
+      expect(built.stage?.status, pipelineStatus).toBe(pipelineStatus);
+    }
+    expect(plan(routed(), "hi", { ...base, pipelineStatus: "SOME_FUTURE_STATUS" }).plan.stage).toBeNull();
+  });
+
+  it("loads the intake rules when code decides a collection question is due", () => {
+    const { plan: built } = plan(routed({ skills: ["clinic-packages"] }), "how much is it?", newLead);
+
+    expect(built.directives.anchor).toBe("area");
+    expect(built.selected.map((skill) => skill.name)).toContain("intake-collection");
+    expect(built.directives.quoteDepositWithPrice).toBe(false);
+  });
+
+  it("leaves the intake rules out when nothing is left to collect", () => {
+    const { plan: built } = plan(routed({ skills: ["clinic-packages"] }));
+    expect(built.selected.map((skill) => skill.name)).not.toContain("intake-collection");
+  });
+});
+
 describe("planner: directives", () => {
   it("asks for the deposit to be quoted with the price at the decision stage only", () => {
     const context = buildPacketContext();

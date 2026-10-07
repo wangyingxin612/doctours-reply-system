@@ -117,6 +117,7 @@ const INTENT_STEP: Partial<Record<Intent, SelfServeStep>> = {
 };
 
 const PAUSE_SKILL = "pause-followup";
+const INTAKE_SKILL = "intake-collection";
 
 const CONSULTATION_URL = "https://www.doctours.com/consultation";
 const IMAGE_UPLOAD_URL = "https://www.doctours.com/image-upload";
@@ -513,7 +514,13 @@ export function buildPlan(input: PlanInput): Plan {
   const { router, context, skills } = input;
   const pausing = router.requestType === "pause";
 
-  const selectedNames = new Set([...router.skills, ...impliedSkills(router)].filter((name) => skills.has(name) && name !== "core"));
+  // Code decides whether a collection question rides on this reply. If one does, its rules load too.
+  const anchor = computeAnchor(context, { pausing });
+  const collecting = anchor.anchor === "none" ? [] : [INTAKE_SKILL];
+
+  const selectedNames = new Set(
+    [...router.skills, ...impliedSkills(router), ...collecting].filter((name) => skills.has(name) && name !== "core"),
+  );
   const selected = [...selectedNames].sort().map((name) => skills.get(name));
   const stage = skills.stage(context.pipelineStatus);
   const loaded = [skills.core, ...(stage ? [stage] : []), ...selected];
@@ -528,7 +535,6 @@ export function buildPlan(input: PlanInput): Plan {
   saveWhatThePatientSaid(input, selection);
 
   const links = planLinks(input, selectedNames, resolvedClinics, selection, pausing);
-  const anchor = computeAnchor(context, { pausing });
 
   const precedence: PrecedenceDecision[] = [...links.precedence];
   if (pausing) {

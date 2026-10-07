@@ -38,6 +38,9 @@ describe("skill loader", () => {
       expect(skill.description.length).toBeGreaterThan(30);
     }
     expect(skills.routable.map((skill) => skill.name)).not.toContain("core");
+    // Stage skills and the intake rules are loaded by code, never offered to the router.
+    expect(skills.routable.some((skill) => skill.name.startsWith("stage-"))).toBe(false);
+    expect(skills.routable.map((skill) => skill.name)).not.toContain("intake-collection");
   });
 
   it("keeps the always-loaded core within its size budget", () => {
