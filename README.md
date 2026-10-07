@@ -22,7 +22,7 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 457 unit tests | No |
+| `npm test` | 492 unit tests | No |
 | `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
@@ -235,7 +235,7 @@ The levers, in order of effect:
 - **`core` is still 15,000 characters.** It is the next thing to trim.
 - **Verbatim skills keep the original's cross-references.** A skill may mention a section that is not loaded. The frame tells the model that such a section does not apply.
 - **Coverage is self-reported.** It is a signal to watch, not a measurement.
-- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 50 dev cases, `escalate` never flipped. Wording did vary between runs: one reply left out the coordinator's name until a directive fixed it, one said "insurers" where my check wanted "insurance", and one said a clinic had a package "in the data I have" on one run of three, which a validator now blocks.
+- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 50 dev cases, `escalate` never flipped. Wording did vary between runs: one reply left out the coordinator's name until a directive fixed it, one said "insurers" where my check then wanted "insurance", and one said a clinic had a package "in the data I have" on one run of three, which a validator now blocks.
 - **The responder can still spend its steps on tools.** It did once, and that message went to a person as a system failure. Code now asks again without tools when that happens. That path has unit tests and has not fired in a live run since.
 
 ## What I would do next
@@ -243,7 +243,7 @@ The levers, in order of effect:
 - Human labels on a sample of escalations, to measure precision in production. The eval can only measure it on cases I wrote.
 - "Asked for a human right after a bot reply" as a satisfaction signal. It needs conversation history that the packet does not provide.
 - A model swap on the responder, judged by cost per passing reply. Effort is settled for now: medium did not beat low on this set.
-- Graders that read replies. My checks test facts and rules. Reading the holdout replies still found a phrase that no check covered.
+- An LLM judge for the checks that are about meaning. "A clear no, with no hedging" is a judgment, and a regular expression can only approximate it. Such checks would be better served by a judge model that grades against a rubric and is calibrated against human labels. Regular expressions would stay for the hard facts: prices, URLs and `escalate`. Reading the holdout replies made the same point: it found a phrase that no pattern covered.
 - Find out why a few router calls took 15 to 36 seconds in two early runs. The traces did not record retries then. They do now, and the slow calls have not come back.
 - Trim `core`, and give every request the same tool list so the cached prefix is shared more widely.
 - A second vertical, to test that a new line of care really is only a new folder.
@@ -287,9 +287,10 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 457 unit tests pass.
+- 492 unit tests pass.
 - The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
-- **Dev set, 50 cases.** The last three runs passed 50 of 50. The third did so after one over-strict check of mine was corrected and its stored replies were scored again. In all three, every case that should escalate did, and none escalated that should not.
+- **Dev set, 50 cases.** The last three runs pass 50 of 50 under the checks as they are now. As first scored, the third was 49: my check for the Medicaid case demanded the word "insurance" and failed a correct reply. I first loosened it, which left a hole, and then rewrote it to test the shape the rule asks for. In all three runs, every case that should escalate did, and none escalated that should not.
+- **The text checks are tested too.** The checks that carry a rule, for the Medicaid, CareCredit and Cherry cases, are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). Each tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject. The three cases were then run again, three times each: 9 of 9.
 - **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
 - **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
 - **The holdout is no longer fully blind.** After its one run I read its replies. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
@@ -305,7 +306,7 @@ What the live runs found, and what changed:
 | A reply to "am I texting with a bot?" left out the coordinator's name | A directive tells the responder the patient asked an identity question. |
 | A holdout reply said "The tool shows" | The internal-vocabulary validator blocks it, and the eval fails any reply that talks about the machinery. |
 | A few router calls took 15 to 36 seconds, with no record of why | Each model call now records the attempts that failed and were retried. |
-| My check for one case demanded the word "insurance" and failed a correct reply | The check now tests the fact. `--recheck` re-scored every stored run. |
+| My check for one case demanded the word "insurance" and failed a correct reply. The looser check I replaced it with passed a wrong one | The eval can now check the first sentence, and ban a word inside sentences about one subject. Three cases use it, and their checks have unit tests. `--recheck` re-scored every stored run. |
 | In a fresh clone, `npm test` failed after the README's command had written `replies.json`: the leak test read that file as source | The leak test reads only files that are in the repository or could be added to it. |
 
 What is not verified:
