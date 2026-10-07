@@ -22,8 +22,8 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 451 unit tests | No |
-| `npm run eval` | Runs the 65 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
+| `npm test` | 455 unit tests | No |
+| `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
 | `npm run report -- <runDir> [<baselineRunDir>]` | The Monday escalation report for a run, with the change against a baseline | No |
@@ -189,20 +189,27 @@ The subtask has its own prompt, its own entry in the trace and its own token cou
 
 Both systems were run on the 50 dev cases on 2026-10-07. `npm run baseline` runs the original prompt the way the packet's Flow section describes: the filled prompt as the system message, all 14 tools in the model's hands, one `Reply` back. It uses the same model and effort as this system's responder, and the same checks, except reason codes, which the original prompt does not have. All it is told about escalation is the packet's own note on the two output fields. Its prompt is cached, which is the cheapest way to run it.
 
-| | Original prompt | This system |
+**The original prompt has no escalation path by design, so its score is in two parts.** The 36 cases that need an answer are the like-for-like comparison. The 14 that need a person test a requirement the original prompt was never written for.
+
+| Cases passed | Original prompt | This system |
 | --- | --- | --- |
-| Cases passed | 31 of 50 | 50 of 50 |
-| The 14 cases that need a person | 2 | 14 |
-| The 36 cases that need an answer | 29 | 36 |
-| Input tokens per message | about 128,000 | about 15,500 |
-| Model calls per message | 2.3 on average, 10 at most | 1.7 on average, 4 at most |
-| Cost per message, cache warm | $0.034 | $0.011 |
-| Cost per message, no caching | $0.26 | $0.029 |
+| Non-escalation cases, the like-for-like comparison | 29 of 36 | 36 of 36 |
+| Escalation cases, which the original prompt has no path for | 2 of 14 | 14 of 14 |
+| All cases | 31 of 50 | 50 of 50 |
+
+| Per message | Original prompt | This system |
+| --- | --- | --- |
+| Input tokens | about 128,000 | about 15,500 |
+| Model calls, as run | 2.3 on average, 10 at most | 1.7 on average, 4 at most |
+| Model calls, the limit | none of its own (the runner stops it at 10) | 7 |
+| Cost, cache warm | $0.034 | $0.011 |
+| Cost, no caching | $0.26 | $0.029 |
 | Latency, p50 and p95 | 4.8 s and 15.6 s | 6.0 s and 9.0 s |
 
 How to read it:
 
-- **The cases are mine, and 14 of them test escalation, which the original prompt was never written for.** Twelve of its 19 misses are those. The fairer comparison is the 36 answer cases: 29 against 36.
+- **The cases are mine.** Fourteen of them test escalation, and twelve of the original prompt's 19 misses are those. The dev set has two more cases now, added after these runs. They are not in the tables.
+- **The limit on model calls.** One message makes at most 7 model calls here: the router, the call-history subtask when the call records are long, three responder calls with tools, one more without tools if all three went to tool calls, and one repair. The first two are on the small model. A request that fails and is retried is another attempt at the same call, up to five by default, and is not counted.
 - **What the original prompt got wrong on answers.** Five replies left out a link. Two of those are packet messages whose expected replies include it. One reply repeated the last digits of the patient's card back to them. One told the patient "I can't match or confirm a direct quote", the cold refusal the original prompt itself forbids.
 - **What it did on escalations.** It escalated 4 of the 14. Two of those kept answering after the handoff, with figures. One message got no reply at all: the model was still calling tools after ten model calls.
 - **Tokens.** The original prompt and its tool definitions are 60,310 tokens, measured. Every model call reads them again. This system reads about 4,900 tokens in the router and about 14,400 in the responder for an answered message. The original prompt's token and cost figures leave out the one message that got no reply, because the runner did not record a failed call's usage at the time. The real figures are a little higher.
@@ -228,7 +235,7 @@ The levers, in order of effect:
 - **`core` is still 15,000 characters.** It is the next thing to trim.
 - **Verbatim skills keep the original's cross-references.** A skill may mention a section that is not loaded. The frame tells the model that such a section does not apply.
 - **Coverage is self-reported.** It is a signal to watch, not a measurement.
-- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 50 dev cases, `escalate` never flipped, and no case passed on some runs and failed on others. What did differ between separate runs was wording: one reply left out the coordinator's name until a directive fixed it, and another said "insurers" where my check wanted "insurance".
+- **Run-to-run variation.** With no temperature setting, wording varies. The parts that must not vary are code. Over three runs of each of the 50 dev cases, `escalate` never flipped. Wording did vary between runs: one reply left out the coordinator's name until a directive fixed it, one said "insurers" where my check wanted "insurance", and one said a clinic had a package "in the data I have" on one run of three, which a validator now blocks.
 - **The responder can still spend its steps on tools.** It did once, and that message went to a person as a system failure. Code now asks again without tools when that happens. That path has unit tests and has not fired in a live run since.
 
 ## What I would do next
@@ -251,9 +258,9 @@ The levers, in order of effect:
 - **The packet's examples overlap its own tests.** Two examples in the original prompt repeat the wording of a test message or an expected reply. They are deleted from the skills. Their rules stay.
 - **Rules for tools that are not in the packet.** Booked-patient tools, trip tools and document links are referenced by the original prompt and do not exist here. Those lines are not ported.
 
-## Text that is not from the original prompt
+## What is not from the original prompt
 
-Skills contain none, and a test enforces it. Everything I wrote for a model is in `src/prompts/`:
+Skills contain no text of mine, and a test enforces it. Everything I wrote for a model is in `src/prompts/`:
 
 | File | What it says |
 | --- | --- |
@@ -263,7 +270,16 @@ Skills contain none, and a test enforces it. Everything I wrote for a model is i
 | `call-history.md` | Extract only what the calls say that bears on the message. |
 | `user-message.txt` | The packet's user-message template, unchanged. |
 
-Code also sends directives. One of them is a rule I added: at the decision stage, a price is quoted with its deposit.
+Behavior that is not from the original prompt:
+
+- **Escalation.** The packet asks for it and the original prompt has none. The reason codes, the handoff sentence and the decline sentences are mine.
+- **A price is quoted with its deposit** at the decision stage. This is the `quoteDepositWithPrice` directive. I added it because the packet's expected replies do it.
+- **The link rule.** When the answer is about a step the patient can complete alone, that page's link is part of the answer, even where the original prompt would hold a link back. This is the `links.include` directive. I added it for the same reason.
+- **The `identityQuestion` directive.** When the router labels a message as an identity question, the responder is pointed at the original prompt's identity rule. The rule's words are the original's. Applying it when a patient asks "am I texting with a bot?" is my choice, and the sentence in which the reply says it is an AI is the model's own.
+- **The retry without tools.** When the responder spends its three model calls on tool calls, code asks once more with no tools. The original flow has no step limit and no retry.
+- **Tool access.** The responder gets only the read tools its loaded skills allow, minus any whose result code already fetched. Writes and payment links belong to code.
+- **Checks and one repair.** Most of the eleven validators enforce a rule the original prompt states. Two have no source in it: no claim to be human, and no card data in any field. The internal-vocabulary check goes further than the original, which gives one example of internal talk.
+- **Card data is removed** from the message before any model sees it.
 
 The packet's five test messages and expected replies are only in `eval/packet/`. A test fails if any of that wording appears elsewhere in the repo, and another fails if runtime code reads from `eval/` or `docs/`.
 
@@ -271,12 +287,14 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 451 unit tests pass.
-- The five packet messages passed end to end on every eval run.
+- 455 unit tests pass.
+- The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
 - **Dev set, 50 cases.** The last three runs passed 50 of 50. The third did so after one over-strict check of mine was corrected and its stored replies were scored again. In all three, every case that should escalate did, and none escalated that should not.
-- **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. No case passed on some runs and failed on others.
-- **Holdout, 15 cases.** Written after tuning, run once, 15 of 15 passed, and all five escalations were right. I then read the replies. One said "The tool shows 3 hotel nights included", which no check covered. A validator now blocks that phrasing. The fix came after the run, so the 15 of 15 stands as run, and these cases are no longer unseen.
-- **Original prompt, same 50 dev cases.** 31 of 50. See "Cost and speed".
+- **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
+- **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
+- **The holdout is no longer fully blind.** After its one run I read its replies. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
+- **Two dev cases added on review**, one that names two clinics and one that names one and points at the other. Both passed on their one run. In both the router found both clinics, so code fetched both. The path where the model fetches the second clinic itself is covered by a unit test.
+- **Original prompt, same 50 dev cases.** 29 of the 36 cases that need an answer, and 2 of the 14 that need a person. See "Cost and speed".
 - **Effort.** Medium passed the same 50 cases as low, at the same latency.
 
 What the live runs found, and what changed:
@@ -285,7 +303,7 @@ What the live runs found, and what changed:
 | --- | --- |
 | One message went to a person because the responder spent its three model calls on tool calls | Code asks once more without tools. A tool whose result code already fetched is no longer offered. |
 | A reply to "am I texting with a bot?" left out the coordinator's name | A directive tells the responder the patient asked an identity question. |
-| A reply said "The tool shows" | The internal-vocabulary validator blocks it. |
+| A holdout reply said "The tool shows" | The internal-vocabulary validator blocks it, and the eval fails any reply that talks about the machinery. |
 | A few router calls took 15 to 36 seconds, with no record of why | Each model call now records the attempts that failed and were retried. |
 | My check for one case demanded the word "insurance" and failed a correct reply | The check now tests the fact. `--recheck` re-scored every stored run. |
 
