@@ -4,42 +4,18 @@
 // exactly what the responder would be shown, and counts characters. The run's own token counts
 // give the characters-per-token rate, which then estimates the original prompt's size in tokens.
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { buildPacketContext } from "../../src/context/fixture";
-import * as constants from "../../src/context/packet";
 import { routerSnapshot } from "../../src/context/snapshot";
 import { buildPlan } from "../../src/pipeline/plan";
 import { renderResponderPrompt } from "../../src/pipeline/responder";
 import { routerSystemPrompt, type RouterOutput } from "../../src/pipeline/router";
-import { fillPrompt, loadPrompt } from "../../src/prompts";
 import { loadRun } from "../../src/report/aggregate";
 import { loadSkills } from "../../src/skills/loader";
 import { TurnLedger } from "../../src/tools/ledger";
+import { originalSystemPrompt, originalUserMessage } from "./original";
 
 const context = buildPacketContext();
 const skills = loadSkills(context.vertical);
-
-/** The original system prompt with every {{NAME}} filled from the packet's constants, as its Flow section says. */
-function originalPrompt(): { system: string; user: string } {
-  const lines = readFileSync(join(import.meta.dirname, "..", "..", "docs", "packet.md"), "utf8").split("\n");
-  const heading = lines.indexOf("### System prompt");
-  const open = lines.findIndex((line, index) => index > heading && line.startsWith("```"));
-  const close = lines.findIndex((line, index) => index > open && line === "```");
-  const template = lines.slice(open + 1, close).join("\n");
-
-  const values = constants as unknown as Record<string, unknown>;
-  const system = template.replace(/\{\{([A-Z_]+)\}\}/g, (placeholder, name: string) => {
-    const value = values[name];
-    if (value === undefined) return placeholder;
-    return typeof value === "string" ? value : JSON.stringify(value);
-  });
-  const user = fillPrompt(loadPrompt("user-message.txt"), {
-    HUMAN_MESSAGE: "x".repeat(60),
-    RECENT_CONVERSATION_SUMMARY: constants.RECENT_CONVERSATION_SUMMARY,
-  });
-  return { system, user };
-}
 
 const runDir = process.argv[2];
 if (!runDir) {
@@ -47,8 +23,8 @@ if (!runDir) {
   process.exit(2);
 }
 
-const original = originalPrompt();
-const originalChars = original.system.length + original.user.length;
+// A patient message of typical length stands in for the real one.
+const originalChars = originalSystemPrompt().length + originalUserMessage("x".repeat(60)).length;
 const routerChars = (text: string) => routerSystemPrompt(skills).length + routerSnapshot(context).length + text.length + 24;
 
 interface Row {

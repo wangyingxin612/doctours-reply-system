@@ -8,6 +8,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "baseline": "tsx eval/baseline/run.ts",
     "eval": "tsx eval/run.ts",
     "report": "tsx src/cli/report.ts",
     "respond": "tsx src/cli/respond.ts",
