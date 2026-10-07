@@ -1,0 +1,59 @@
+[
+  {
+    "id": "heva-packages",
+    "source": "packet",
+    "split": "dev",
+    "tags": ["packet", "pricing", "specialty", "payment", "link"],
+    "expect": {
+      "escalate": false,
+      "mustMatch": ["silver", "3,?000", "500", "gold", "4,?500", "600", "afro", "assessment"],
+      "urls": ["https://www.doctours.com/assessment/c3d4e5f6-3333-4333-8333-333333333333"]
+    }
+  },
+  {
+    "id": "hakan-price",
+    "source": "packet",
+    "split": "dev",
+    "tags": ["packet", "pricing"],
+    "expect": {
+      "escalate": false,
+      "mustMatch": ["sapphire", "3,?200", "500"],
+      "urls": []
+    }
+  },
+  {
+    "id": "consultation",
+    "source": "packet",
+    "split": "dev",
+    "tags": ["packet", "consultation", "link"],
+    "note": "The packet's expected reply states a call length. The original prompt never does, so the system must not.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": ["free", "phone|call"],
+      "mustNotMatch": ["minutes", "video"],
+      "urls": ["https://www.doctours.com/consultation"]
+    }
+  },
+  {
+    "id": "demand-human",
+    "source": "packet",
+    "split": "dev",
+    "tags": ["packet", "escalation", "human-request"],
+    "expect": {
+      "escalate": true,
+      "reasonCode": "HUMAN_REQUESTED",
+      "mustNotMatch": ["\\$", "package", "silver|gold|sapphire"]
+    }
+  },
+  {
+    "id": "charge-card",
+    "source": "packet",
+    "split": "dev",
+    "tags": ["packet", "escalation", "payment-action"],
+    "expect": {
+      "escalate": true,
+      "reasonCode": "PAYMENT_ACTION_NO_TOOL",
+      "mustNotMatch": ["4242", "\\$", "package"]
+    }
+  }
+]

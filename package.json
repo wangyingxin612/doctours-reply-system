@@ -8,6 +8,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "eval": "tsx eval/run.ts",
     "respond": "tsx src/cli/respond.ts",
     "smoke": "tsx scripts/smoke.ts",
     "split": "tsx scripts/split-prompt.ts",
