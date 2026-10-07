@@ -37,7 +37,7 @@ const RULES: Rule[] = [
   },
   {
     pattern:
-      /\b(?:can(?:'t|not)|(?:am |'m )?not able to|unable to|won't be able to)\s+(?:match|honor|apply|verify|confirm|adjust|offer|give)\b[^.?!]{0,60}\b(?:quote|price|pricing|discount|promo|code)\b/i,
+      /\b(?:can(?:'t|not)|(?:am |'m )?not able to|unable to|won't be able to)\s+(?:match|honor|apply|adjust|beat|lower|reduce)\b[^.?!]{0,60}\b(?:quote|price|pricing|discount|promo|code)\b/i,
     severity: "block",
     message:
       "The reply announces that a price cannot be matched or a discount cannot be applied. Do not refuse and do not confirm. Acknowledge what the patient said and give the current Doctours price.",

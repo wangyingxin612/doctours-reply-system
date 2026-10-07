@@ -52,6 +52,8 @@ describe("banned_phrases", () => {
     "I'll get the hairline redrawn lower and send you the updated plan.",
     "The Doctours consultant calls you at the scheduled time.",
     "Holding specific dates isn't something I can do. The deposit is what secures your date request.",
+    "I don't have the nightly rate for that package. It is set at checkout.",
+    "I can't confirm a price for an add-on the clinic's package list doesn't show.",
   ])("passes wording the original prompt uses: %s", (response) => {
     expect(severities(response)).toEqual([]);
   });
