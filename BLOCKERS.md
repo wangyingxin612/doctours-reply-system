@@ -27,6 +27,7 @@ Opened and closed on 2026-10-07. You added credit, and I ran everything that was
 | `npm run smoke` | All four live checks passed. |
 | `npm run eval -- --split dev --run-id after-fixes` | 49 of 50. The three earlier failures were fixed. One new failure: the responder ran out of steps. Fixed. |
 | `npm run eval -- --split dev --repeat 3 --run-id stability` | 49 of 50 on every run. `escalate` flipped on 0 of 50 cases. The one failure was the identity reply. Fixed. Under the machinery check added later, one more case fails one run of three. Not re-run on the final code. |
+| `npm run eval -- --split dev --repeat 3 --run-id stability-final` | On the final code, 52 cases. `escalate` flipped on 0. 51 passed on every run. One failed one run of three on a gap in a validator rule. The rule is fixed, and the case then passed 5 runs of 5. |
 | `npm run eval -- --split dev --run-id dev-final` | 50 of 50. |
 | `RESPONDER_EFFORT=medium npm run eval -- --split dev --run-id effort-medium` | 50 of 50, with 2% more output tokens and the same latency as low. Low stays the default. |
 | `npm run baseline -- --split dev --run-id baseline-dev` | The original prompt: 31 of 50, and 2 of the 14 escalation cases. |

@@ -394,7 +394,7 @@ All accepted in review.
 | M4 Remaining skills | Done. 26 skills, every one built by `scripts/split-prompt.ts`. |
 | M5 Full router and planner | Done. |
 | M6 Remaining validators and failure handling | Done. Eleven validators. |
-| M7 Eval and tuning | Done. 50 dev cases and 15 holdout cases. The last three dev runs passed 50 of 50. Over three runs per case, `escalate` flipped on 0 of 50. The holdout ran once: 15 of 15. Medium effort did not beat low. |
+| M7 Eval and tuning | Done. 50 dev cases and 15 holdout cases. The last three dev runs passed 50 of 50. Over three runs per case on the final code, `escalate` flipped on 0 of 52. The holdout ran once: 15 of 15. Medium effort did not beat low. |
 | M8 Monday report | Done, and run on real traces. |
 | M9 README and wrap-up | Done. The full baseline ran once (`npm run baseline`): the original prompt passed 31 of the 50 dev cases. The static size comparison (`npm run size`) is kept. |
 | M10 Unreachable stages | Done. No eval coverage, as planned. |

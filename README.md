@@ -22,7 +22,7 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 501 unit tests | No |
+| `npm test` | 509 unit tests | No |
 | `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
@@ -232,6 +232,7 @@ The levers, in order of effect:
 - **Two model calls per answered message.** The router adds about 3.7 seconds and half a cent. That makes the median reply slower than the original prompt's, 6.0 s against 4.8 s. In return, the escalation decision and the skill choice are inspectable.
 - **The router can pick the wrong skill.** Then the responder lacks a rule. Code softens this: a classification implies skills even when the router does not list them, clinic names are also matched by plain word match, and a missing fact leads to "I don't have that detail", not to a guess.
 - **Validators can cause escalations.** A reply that fails twice goes to a person. The report counts these as avoidable and names the validator.
+- **One kind of message costs a repair every time.** When a patient shares a clinic's direct quote, the first draft says it cannot match the price, the validator blocks it, and the repair fixes it. That happened on five runs of five. A directive for this case would save the extra model call.
 - **`core` is still 15,000 characters.** It is the next thing to trim.
 - **Verbatim skills keep the original's cross-references.** A skill may mention a section that is not loaded. The frame tells the model that such a section does not apply.
 - **Coverage is self-reported.** It is a signal to watch, not a measurement.
@@ -244,7 +245,7 @@ The levers, in order of effect:
 - "Asked for a human right after a bot reply" as a satisfaction signal. It needs conversation history that the packet does not provide.
 - A model swap on the responder, judged by cost per passing reply. Effort is settled for now: medium did not beat low on this set.
 - An LLM judge for the checks that are about meaning. "A clear no, with no hedging" is a judgment, and a regular expression can only approximate it. Such checks would be better served by a judge model that grades against a rubric and is calibrated against human labels. Regular expressions would stay for the hard facts: prices, URLs and `escalate`. Reading the holdout replies made the same point: it found a phrase that no pattern covered.
-- Find out why a few router calls took 15 to 36 seconds in two early runs. The traces did not record retries then. They do now, and the slow calls have not come back.
+- A shorter wait before a retry. A request that gets no response costs about ten seconds before the retry starts. It happened on 3 of 840 model calls, always on the router. I have not found why those requests fail.
 - Trim `core`, and give every request the same tool list so the cached prefix is shared more widely.
 - A second vertical, to test that a new line of care really is only a new folder.
 
@@ -287,11 +288,11 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 501 unit tests pass.
-- The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
+- 509 unit tests pass.
+- The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its earlier stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording, and in the final stability run all five passed three times of three.
 - **Dev set, 50 cases.** The last three runs pass 50 of 50 under the checks as they are now. As first scored, the third was 49: my check for the Medicaid case demanded the word "insurance" and failed a correct reply. I first loosened it, which left a hole, and then rewrote it to test the shape the rule asks for. In all three runs, every case that should escalate did, and none escalated that should not.
 - **The text checks are tested too.** The eval's text checks for the four financing and insurance cases are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). For the Medicaid, CareCredit and Cherry cases each check tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject. For the monthly-payment case the check rejects the answer meant for a patient outside the US and Canada, and any stated payment schedule. The four cases were then run again, three times each: 12 of 12.
-- **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
+- **Stability, on the final code.** Each of the 52 dev cases was run three times, 156 messages. `escalate` flipped on 0 of 52 cases, and every escalation was right. 51 cases passed on every run. One failed one run of three: to a patient who shared a clinic's direct quote, the reply said "I can't match or negotiate that number", and the validator's price-refusal rule did not know that wording. The rule is wider now, and the case then passed five runs of five. An earlier stability run, before the last fixes, also had no flip of `escalate`.
 - **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
 - **The holdout is no longer fully blind.** After its one run I read its replies. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
 - **Two dev cases added on review**, one that names two clinics and one that names one and points at the other. Both passed on their one run. In both the router found both clinics, so code fetched both. The path where the model fetches a second clinic itself is covered by a unit test, and it happened once live: in the holdout run, on a question that named no clinic, the model fetched the doctors of both clinics itself.
@@ -312,7 +313,7 @@ What the live runs found, and what changed:
 What is not verified:
 
 - The fallback for a responder that runs out of steps has unit tests only. It has not fired in a live run since it was added.
-- The cause of the slow router calls is unknown. They did not recur in the last five runs: 0 retries in 524 model calls.
+- The slow router calls are explained only in part. Since the traces record retries, 3 of 840 model calls were retried. All three were router calls that got no response on the first attempt and succeeded on the second, and each took 16 to 17 seconds in all. That is about ten seconds lost per failed attempt, which matches the slow calls of the early runs. So those were most likely requests that never got an answer, not slow answers from the model. The early runs recorded no retries, so this is not proven for them, and I have not found why the requests fail.
 - The holdout checks are light. Most test the escalation decision and the links, not every sentence.
 - The baseline ran once.
 - The stage skills other than `PRE_CLINICAL_SENT` and the intake rules are ported but have no eval coverage, because the packet fixes the patient's stage.
