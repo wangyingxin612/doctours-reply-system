@@ -421,5 +421,5 @@ What the live runs after the top-up changed:
 - The internal-vocabulary validator also blocks talk about the machinery, such as "the tool shows". The eval fails any reply that does it, on every case, with a check of its own. Both came from reading the holdout replies after their one run, so the holdout is no longer blind.
 - Each model call in a trace records the HTTP status of every attempt that failed and was retried.
 - `npm run eval -- --recheck <runDir>` scores a past run again from its traces, with no model call.
-- The eval has two more kinds of text check: one on the first sentence, and one that bans a pattern inside sentences about a subject. The Medicaid, CareCredit and Cherry cases use them, and `test/eval/textChecks.test.ts` runs those checks on replies known to be good and bad.
+- The eval has two more kinds of text check: one on the first sentence, and one that bans a pattern inside sentences about a subject. The Medicaid, CareCredit and Cherry cases use them. `test/eval/textChecks.test.ts` runs the checks of those cases, and of the monthly-payment case, on replies known to be good and bad.
 - `npm run baseline` exists and has run. Its output schema makes the working-memory fields optional and not nullable, because the API accepts at most 16 nullable fields in one schema.

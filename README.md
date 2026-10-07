@@ -22,7 +22,7 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 495 unit tests | No |
+| `npm test` | 501 unit tests | No |
 | `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
@@ -287,10 +287,10 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 495 unit tests pass.
+- 501 unit tests pass.
 - The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
 - **Dev set, 50 cases.** The last three runs pass 50 of 50 under the checks as they are now. As first scored, the third was 49: my check for the Medicaid case demanded the word "insurance" and failed a correct reply. I first loosened it, which left a hole, and then rewrote it to test the shape the rule asks for. In all three runs, every case that should escalate did, and none escalated that should not.
-- **The text checks are tested too.** The checks that carry a rule, for the Medicaid, CareCredit and Cherry cases, are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). Each tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject. The three cases were then run again, three times each: 9 of 9.
+- **The text checks are tested too.** The eval's text checks for the four financing and insurance cases are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). For the Medicaid, CareCredit and Cherry cases each check tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject. For the monthly-payment case the check rejects the answer meant for a patient outside the US and Canada, and any stated payment schedule. The four cases were then run again, three times each: 12 of 12.
 - **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
 - **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
 - **The holdout is no longer fully blind.** After its one run I read its replies. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
@@ -306,7 +306,7 @@ What the live runs found, and what changed:
 | A reply to "am I texting with a bot?" left out the coordinator's name | A directive tells the responder the patient asked an identity question. |
 | A holdout reply said "The tool shows" | The internal-vocabulary validator blocks it, and the eval fails any reply that talks about the machinery. |
 | A few router calls took 15 to 36 seconds, with no record of why | Each model call now records the attempts that failed and were retried. |
-| My check for one case demanded the word "insurance" and failed a correct reply. The looser check I replaced it with passed a wrong one | The eval can now check the first sentence, and ban a word inside sentences about one subject. Three cases use it, and their checks have unit tests. `--recheck` re-scored every stored run. |
+| My check for one case demanded the word "insurance" and failed a correct reply. The looser check I replaced it with passed a wrong one | The eval can now check the first sentence, and ban a word inside sentences about one subject. Four cases have checks rewritten this way, with unit tests. `--recheck` re-scored every stored run. |
 | In a fresh clone, `npm test` failed after the README's command had written `replies.json`: the leak test read that file as source | The leak test reads only files that are in the repository or could be added to it. |
 
 What is not verified:

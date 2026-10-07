@@ -12,7 +12,7 @@ These are decisions I made while you were away. None is in the design brief, and
 2. **A tool whose result code already fetched is not offered to the model.** Same commit.
 3. **A new directive, `identityQuestion`**, and one line in the responder's frame. Commit `695a318`.
 4. **A new pattern in the internal-vocabulary validator**, found by reading the holdout replies after their one run. Commit `7c66f59`.
-5. **I changed the checks of three eval cases** (`medicaid`, `carecredit`, `h-cherry`). The first change, in `e4488ab`, loosened the `medicaid` check and left a hole. You caught it. The checks now test the shape each rule asks for, and they have unit tests of their own.
+5. **I changed the checks of four eval cases** (`medicaid`, `carecredit`, `h-cherry`, `monthly-payments`). The first change, in `e4488ab`, loosened the `medicaid` check and left a hole. You caught it. The checks now test the shape each rule asks for, and they have unit tests of their own.
 
 What is left for you: merge `build` into `main`, push, and give the reviewers access to the repository.
 
