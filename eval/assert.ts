@@ -24,6 +24,9 @@ export const caseSchema = z.strictObject({
     escalate: z.boolean(),
     /** The primary reason code, when the case pins it. */
     reasonCode: z.string().optional(),
+    /** Use instead of reasonCode when more than one code is a correct reading of the message. */
+    reasonCodeIn: z.array(z.string()).optional(),
+    shouldFollowUp: z.boolean().optional(),
     /** Regular expressions, case-insensitive. Every one must match the response. */
     mustMatch: z.array(z.string()).optional(),
     /** Regular expressions, case-insensitive. None may match the response. */
@@ -61,6 +64,12 @@ export function checkCase(testCase: EvalCase, reply: Reply, trace: Trace): CaseR
   }
   if (expect.reasonCode !== undefined && trace.decision.reasonCode !== expect.reasonCode) {
     failures.push(`reason code is ${trace.decision.reasonCode}, expected ${expect.reasonCode}`);
+  }
+  if (expect.reasonCodeIn !== undefined && !expect.reasonCodeIn.includes(trace.decision.reasonCode ?? "")) {
+    failures.push(`reason code is ${trace.decision.reasonCode}, expected one of ${expect.reasonCodeIn.join(", ")}`);
+  }
+  if (expect.shouldFollowUp !== undefined && reply.shouldFollowUp !== expect.shouldFollowUp) {
+    failures.push(`shouldFollowUp is ${reply.shouldFollowUp}, expected ${expect.shouldFollowUp}`);
   }
   // A failure that happens to land on the expected side of escalate is still a failure of the system.
   if (trace.failure !== null) failures.push(`pipeline failure: ${trace.failure.cause}: ${trace.failure.detail}`);
