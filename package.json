@@ -1,0 +1,26 @@
+{
+  "name": "doctours-reply-system",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Structured reply pipeline for the Doctours pre-deposit concierge. Code decides, the model writes.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.74",
+    "ai": "^7.0.130",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}
