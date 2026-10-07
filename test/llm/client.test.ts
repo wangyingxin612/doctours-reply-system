@@ -131,8 +131,45 @@ describe("callModel", () => {
     expect(result.toolCalls).toEqual([{ name: "lookupTool", input: { name: "alpha" }, output: { open: "weekdays" } }]);
   });
 
+  it("reports what a call used when the step limit runs out during tool calls", async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: {
+        content: [{ type: "tool-call", toolCallId: "call-1", toolName: "lookupTool", input: '{"name":"alpha"}' }],
+        finishReason: { unified: "tool-calls", raw: undefined },
+        usage,
+        warnings: [],
+      },
+    });
+
+    const error = await failure(
+      callModel(
+        {
+          ...request("responder"),
+          tools: { lookupTool: { description: "Look up a record.", inputSchema: z.object({ name: z.string() }), execute: () => ({ open: "weekdays" }) } },
+          maxSteps: 2,
+        },
+        { config, model },
+      ),
+    );
+
+    expect(error.failureCause).toBe("invalid_output");
+    expect(error.message).toBe("The model was still calling tools at the step limit.");
+    expect(error.spentAtStepLimit).toMatchObject({
+      steps: 2,
+      model: "mock-model-id",
+      usage: { inputTokens: 40, cacheReadTokens: 200, cacheWriteTokens: 0, outputTokens: 60, reasoningTokens: 16 },
+    });
+  });
+
   it("reports a reply that breaks the schema as invalid_output", async () => {
     const model = new MockLanguageModelV4({ doGenerate: textReply('{"wrong":1}') });
+    const error = await failure(callModel(request("responder"), { config, model }));
+    expect(error.failureCause).toBe("invalid_output");
+    expect(error.spentAtStepLimit).toBeUndefined();
+  });
+
+  it("reports a reply that is not JSON as invalid_output", async () => {
+    const model = new MockLanguageModelV4({ doGenerate: textReply("Sure, here you go.") });
     const error = await failure(callModel(request("responder"), { config, model }));
     expect(error.failureCause).toBe("invalid_output");
   });

@@ -88,6 +88,12 @@ const TOOL_BINDING: Partial<Record<ToolName, Binding>> = {
   getClinicDoctorsTool: "clinic",
 };
 
+/** True when code fills in the tool's whole input. A second call could only return the same thing. */
+export function hasFixedInput(tool: ToolName): boolean {
+  const binding = TOOL_BINDING[tool];
+  return binding !== undefined && binding !== "clinic";
+}
+
 /** The skill that holds the rules for each self-serve step and each kind of link. */
 const SELF_SERVE_SKILL: Record<SelfServeStep, string> = {
   pay_deposit: "payment-deposit",

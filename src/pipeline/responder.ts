@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { ModelConfig } from "../../config/models";
 import { patientContextBlock } from "../context/snapshot";
 import type { PatientContext } from "../context/types";
-import { callModel, type LlmDeps, type LlmResult, type LlmTool, type SystemBlock } from "../llm/client";
+import { callModel, LlmError, type LlmDeps, type LlmResult, type LlmSpend, type LlmTool, type SystemBlock } from "../llm/client";
 import { fillPrompt, loadPrompt } from "../prompts";
 import {
   COMMUNICATION_STYLES,
@@ -22,7 +22,7 @@ import { TOOL_REGISTRY, type ToolDefinition } from "../tools/registry";
 import type { ModelStage } from "../trace/types";
 import { blocking, runValidators, type ValidationContext } from "../validators";
 import { ReplyRejectedError } from "./errors";
-import type { Plan } from "./plan";
+import { hasFixedInput, type Plan } from "./plan";
 import type { TurnRecord } from "./run";
 
 /** Model calls allowed in one attempt: at most two tool rounds, then the structured answer. */
@@ -73,7 +73,12 @@ function factsBlock(ledger: TurnLedger, extraFacts: readonly ExtraFact[]): strin
   }
 
   lines.push("Results of tool calls made for this message.");
+  // The model may repeat a call code already made. The same result is shown once.
+  const shown = new Set<string>();
   for (const call of calls) {
+    const key = JSON.stringify([call.name, call.input, call.output]);
+    if (shown.has(key)) continue;
+    shown.add(key);
     const saved = call.kind === "write" ? " (saved this turn)" : "";
     lines.push("", `## ${call.name}(${JSON.stringify(call.input)})${saved}`, JSON.stringify(call.output));
   }
@@ -128,10 +133,16 @@ function userPrompt(input: PromptInput): string {
   });
 }
 
+/**
+ * The tools the loaded skills allow, minus any whose result is already in the facts. Handing the
+ * model a tool for something code already fetched only invites it to spend a step fetching it again.
+ */
 function toolsFor(input: ResponderInput): Record<string, LlmTool> | undefined {
-  if (input.plan.tools.length === 0) return undefined;
+  const fetched = new Set(input.ledger.calls.map((call) => call.name));
+  const names = input.plan.tools.filter((name) => !(hasFixedInput(name) && fetched.has(name)));
+  if (names.length === 0) return undefined;
   return Object.fromEntries(
-    input.plan.tools.map((name) => {
+    names.map((name) => {
       const definition: ToolDefinition = TOOL_REGISTRY[name];
       const tool: LlmTool = {
         description: definition.description,
@@ -180,26 +191,46 @@ function validationContext(input: ResponderInput): ValidationContext {
   };
 }
 
-function recordCall(record: TurnRecord, stage: ModelStage, result: LlmResult<unknown>): void {
+function recordCall(record: TurnRecord, stage: ModelStage, spend: LlmSpend): void {
   record.modelCalls.push({
     stage,
-    model: result.model,
-    ...result.usage,
-    steps: result.steps,
-    latencyMs: result.latencyMs,
+    model: spend.model,
+    ...spend.usage,
+    steps: spend.steps,
+    latencyMs: spend.latencyMs,
   });
+}
+
+/**
+ * The first draft. With tools, the model gets MAX_STEPS calls. If it spends them all on tool calls,
+ * it is asked once more without tools: what it fetched is in the ledger, so the facts now hold it,
+ * and the step limit ends in a reply and not in a hand-off.
+ */
+async function firstDraft(input: ResponderInput, prompt: string, llm: LlmDeps): Promise<LlmResult<ResponderOutput>> {
+  const tools = toolsFor(input);
+  const answerFromFacts = () =>
+    callModel({ role: "responder", system: systemBlocks(input), prompt, schema: responderSchema }, llm);
+  if (!tools) return answerFromFacts();
+
+  try {
+    return await callModel(
+      { role: "responder", system: systemBlocks(input), prompt, schema: responderSchema, tools, maxSteps: MAX_STEPS },
+      llm,
+    );
+  } catch (error) {
+    if (!(error instanceof LlmError) || error.spentAtStepLimit === undefined) throw error;
+    recordCall(input.record, "responder", error.spentAtStepLimit);
+    input.record.events.push({ type: "tool_rounds_exhausted", detail: { steps: error.spentAtStepLimit.steps } });
+    return answerFromFacts();
+  }
 }
 
 export async function runResponder(input: ResponderInput, deps: LlmDeps = {}): Promise<Reply> {
   const { record, context } = input;
   const llm = { config: input.config, ...deps };
   const prompt = userPrompt(input);
-  const tools = toolsFor(input);
 
-  const first = await callModel(
-    { role: "responder", system: systemBlocks(input), prompt, schema: responderSchema, tools, maxSteps: tools ? MAX_STEPS : 1 },
-    llm,
-  );
+  const first = await firstDraft(input, prompt, llm);
   recordCall(record, "responder", first);
 
   let output = first.output;

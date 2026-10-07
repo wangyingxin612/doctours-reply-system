@@ -75,8 +75,29 @@ function drafted(overrides: Partial<ResponderOutput> = {}): ResponderOutput {
   };
 }
 
+/** A model step that calls one tool instead of answering. */
+class ToolCallStep {
+  constructor(
+    readonly toolName: string,
+    readonly input: unknown,
+  ) {}
+
+  result() {
+    return {
+      content: [{ type: "tool-call" as const, toolCallId: `call-${this.toolName}`, toolName: this.toolName, input: JSON.stringify(this.input) }],
+      finishReason: { unified: "tool-calls" as const, raw: undefined },
+      usage,
+      warnings: [],
+    };
+  }
+}
+
+const toolCall = (toolName: string, input: unknown) => new ToolCallStep(toolName, input);
+
 function run(text: string, replies: unknown[]) {
-  const model = new MockLanguageModelV4({ doGenerate: replies.map(json) });
+  const model = new MockLanguageModelV4({
+    doGenerate: replies.map((reply) => (reply instanceof ToolCallStep ? reply.result() : json(reply))),
+  });
   const deps: PipelineDeps = {
     context: buildPacketContext(),
     config,
@@ -258,6 +279,75 @@ describe("answer stage: validation and repair", () => {
     const { reply, trace } = await run("What does Dr. Hakan cost?", [{ primaryIntent: "not-an-intent" }]);
 
     expect(reply.escalate).toBe(true);
+    expect(trace.failure?.cause).toBe("invalid_output");
+  });
+});
+
+describe("answer stage: the responder's own tool calls", () => {
+  const WINTER_ANSWER = "Winter is a busy season for the clinics in Turkey, so popular months can fill up.";
+  const datesQuestion = () =>
+    routed({ primaryIntent: "dates_availability", intents: ["dates_availability"], skills: ["dates-availability"], entities: { clinics: [] } });
+
+  /** The system text of one call: rules, skills, patient context, facts and directives. */
+  const systemText = (model: MockLanguageModelV4, call: number) =>
+    (model.doGenerateCalls[call]?.prompt ?? []).map((message) => (message.role === "system" ? message.content : "")).join("\n");
+
+  it("does not offer a tool whose result code already fetched", async () => {
+    const { model, trace } = await run("Is winter a busy time for the clinics?", [datesQuestion(), drafted({ response: WINTER_ANSWER })]);
+
+    // The dates skill allows two tools. Code prefetched the patient context, so only the other is offered.
+    expect(trace.toolCalls.filter((call) => call.source === "prefetch").map((call) => call.name)).toContain("getPatientContextTool");
+    expect(model.doGenerateCalls[1]?.tools?.map((tool) => tool.name)).toEqual(["getClinicPackagesTool"]);
+  });
+
+  it("lets the model fetch a fact code did not, and records the call", async () => {
+    const { reply, trace } = await run("Is winter a busy time for the clinics?", [
+      datesQuestion(),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      drafted({ response: WINTER_ANSWER }),
+    ]);
+
+    expect(reply).toMatchObject({ escalate: false, response: WINTER_ANSWER });
+    expect(trace.toolCalls.filter((call) => call.source === "responder").map((call) => call.name)).toEqual(["getClinicPackagesTool"]);
+    expect(trace.modelCalls.map((call) => [call.stage, call.steps])).toEqual([["router", 1], ["responder", 2]]);
+    expect(trace.events).toEqual([]);
+  });
+
+  it("answers from the facts when the model spends every step on tool calls", async () => {
+    const { reply, trace, model } = await run("Is winter a busy time for the clinics?", [
+      datesQuestion(),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Dr. Hakan Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      drafted({ response: WINTER_ANSWER }),
+    ]);
+
+    expect(reply).toMatchObject({ escalate: false, response: WINTER_ANSWER });
+    expect(trace.failure).toBeNull();
+    expect(trace.events).toContainEqual({ type: "tool_rounds_exhausted", detail: { steps: 3 } });
+    // Both responder calls are in the trace, so the steps that produced no answer are still paid for on paper.
+    expect(trace.modelCalls.map((call) => [call.stage, call.steps])).toEqual([["router", 1], ["responder", 3], ["responder", 1]]);
+
+    // The last call has no tools. Its facts hold what the model fetched, and the repeated call is shown once.
+    expect(model.doGenerateCalls).toHaveLength(5);
+    expect(model.doGenerateCalls[4]?.tools ?? []).toEqual([]);
+    const facts = systemText(model, 4);
+    expect(facts.split('## getClinicPackagesTool({"clinicName":"Heva Clinic"})')).toHaveLength(2);
+    expect(facts.split('## getClinicPackagesTool({"clinicName":"Dr. Hakan Clinic"})')).toHaveLength(2);
+    expect(systemText(model, 1)).not.toContain("## getClinicPackagesTool(");
+  });
+
+  it("still hands the message to a person when the call without tools fails too", async () => {
+    const { reply, trace } = await run("Is winter a busy time for the clinics?", [
+      datesQuestion(),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      { wrong: 1 },
+    ]);
+
+    expect(reply).toMatchObject({ escalate: true, response: HANDOFF_SENTENCE });
+    expect(trace.decision).toMatchObject({ reasonCode: "SYSTEM_FAILURE", decidedBy: "validator_fallback" });
     expect(trace.failure?.cause).toBe("invalid_output");
   });
 });

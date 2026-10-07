@@ -55,15 +55,19 @@ export interface LlmToolCall {
   output: unknown;
 }
 
-export interface LlmResult<T> {
-  output: T;
+/** What a call used, whether or not it ended in an answer. */
+export interface LlmSpend {
   usage: LlmUsage;
   steps: number;
-  toolCalls: LlmToolCall[];
-  finishReason: string;
   /** The model that answered. Differs from the requested model only if a fallback served the turn. */
   model: string;
   latencyMs: number;
+}
+
+export interface LlmResult<T> extends LlmSpend {
+  output: T;
+  toolCalls: LlmToolCall[];
+  finishReason: string;
   warnings: string[];
 }
 
@@ -83,12 +87,19 @@ const OUT_OF_CREDIT = /credit balance|purchase credits|billing/i;
 export class LlmError extends Error {
   readonly failureCause: LlmFailureCause;
   readonly statusCode: number | undefined;
+  /** Set only when the step limit ran out while the model was still calling tools: what that attempt used. */
+  readonly spentAtStepLimit: LlmSpend | undefined;
 
-  constructor(failureCause: LlmFailureCause, message: string, options?: { statusCode?: number; cause?: unknown }) {
+  constructor(
+    failureCause: LlmFailureCause,
+    message: string,
+    options?: { statusCode?: number; cause?: unknown; spentAtStepLimit?: LlmSpend },
+  ) {
     super(message, { cause: options?.cause });
     this.name = "LlmError";
     this.failureCause = failureCause;
     this.statusCode = options?.statusCode;
+    this.spentAtStepLimit = options?.spentAtStepLimit;
   }
 }
 
@@ -206,6 +217,24 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
     }
 
     const usage = result.totalUsage;
+    const spend: LlmSpend = {
+      usage: {
+        inputTokens: usage.inputTokenDetails.noCacheTokens ?? usage.inputTokens ?? 0,
+        cacheReadTokens: usage.inputTokenDetails.cacheReadTokens ?? 0,
+        cacheWriteTokens: usage.inputTokenDetails.cacheWriteTokens ?? 0,
+        outputTokens: usage.outputTokens ?? 0,
+        reasoningTokens: usage.outputTokenDetails.reasoningTokens ?? 0,
+      },
+      steps: result.steps.length,
+      model: result.response.modelId,
+      latencyMs: Date.now() - started,
+    };
+
+    if (result.finishReason === "tool-calls") {
+      // Every step went to tool calls, so there is no answer to read. The caller still learns the cost.
+      throw new LlmError("invalid_output", "The model was still calling tools at the step limit.", { spentAtStepLimit: spend });
+    }
+
     const toolCalls: LlmToolCall[] = result.steps.flatMap((step) =>
       step.toolCalls.map((call) => ({
         name: call.toolName,
@@ -216,18 +245,9 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
 
     return {
       output: result.output as T,
-      usage: {
-        inputTokens: usage.inputTokenDetails.noCacheTokens ?? usage.inputTokens ?? 0,
-        cacheReadTokens: usage.inputTokenDetails.cacheReadTokens ?? 0,
-        cacheWriteTokens: usage.inputTokenDetails.cacheWriteTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
-        reasoningTokens: usage.outputTokenDetails.reasoningTokens ?? 0,
-      },
-      steps: result.steps.length,
+      ...spend,
       toolCalls,
       finishReason: result.finishReason,
-      model: result.response.modelId,
-      latencyMs: Date.now() - started,
       warnings: (result.warnings ?? []).map((warning) => JSON.stringify(warning)),
     };
   } catch (error) {
