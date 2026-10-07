@@ -1,0 +1,17 @@
+# secrets
+.env
+.env.*
+!.env.example
+
+# dependencies and build output
+node_modules/
+dist/
+coverage/
+
+# run output
+traces/
+replies*.json
+
+# editor and OS
+.DS_Store
+*.log
