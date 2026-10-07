@@ -8,6 +8,26 @@ interface Rule {
   message: string;
 }
 
+const CANNOT = String.raw`(?:can(?:'t|not)|(?:am |'m )?not able to|unable to|won't be able to)`;
+// A second verb may come first: "verify or apply it", "match or negotiate that number".
+const OR_VERB = String.raw`(?:\w+\s+or\s+)?`;
+
+/**
+ * A refusal about a price: "can't match that", "not able to apply a discount", "can't verify what
+ * the clinic quoted". The verbs and objects are kept narrow, so that "I can't confirm a price the
+ * package list doesn't show" and "I can't apply on your behalf" still pass.
+ */
+const PRICE_REFUSAL = new RegExp(
+  String.raw`\b${CANNOT}\s+${OR_VERB}(?:` +
+    String.raw`(?:match|honor|beat|negotiate|apply)\s+(?:that|it|this)\b` +
+    "|" +
+    String.raw`(?:match|honor|apply|adjust|beat|lower|reduce|negotiate)\b[^.?!]{0,60}\b(?:quote|price|pricing|discount|promo|code)\b` +
+    "|" +
+    String.raw`(?:verify|confirm)\b[^.?!]{0,40}\bquote[ds]?\b` +
+    ")",
+  "i",
+);
+
 // Block: wording the original prompt bans with no exception.
 // Warn: wording it bans in general but requires in some replies ("I'll check in next month",
 // "send done and I'll check it", "I'll send you a link with flight options"). Blocking those would
@@ -36,8 +56,7 @@ const RULES: Rule[] = [
     message: "The reply claims an internal lookup. State only what a tool returned this turn.",
   },
   {
-    pattern:
-      /\b(?:can(?:'t|not)|(?:am |'m )?not able to|unable to|won't be able to)\s+(?:match|honor|apply|adjust|beat|lower|reduce)\b[^.?!]{0,60}\b(?:quote|price|pricing|discount|promo|code)\b/i,
+    pattern: PRICE_REFUSAL,
     severity: "block",
     message:
       "The reply announces that a price cannot be matched or a discount cannot be applied. Do not refuse and do not confirm. Acknowledge what the patient said and give the current Doctours price.",

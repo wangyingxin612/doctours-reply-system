@@ -42,6 +42,12 @@ describe("banned_phrases", () => {
     "I checked our side and I don't see the promo active in our system.",
     "Thanks for sharing that. I can't match or adjust a direct quote.",
     "I'm not able to apply a discount to that package.",
+    // Got past the rule in a live run: the object was "that number", not "quote" or "price".
+    "I can't match or negotiate that number, but here's what Doctours has for Dr. Hakan Clinic.",
+    "I can't match that.",
+    "Since that quote came directly from the clinic, I'm not able to verify or apply it through Doctours.",
+    "I can't verify what the clinic quoted you directly.",
+    "I won't be able to beat their price.",
   ])("blocks: %s", (response) => {
     expect(severities(response)).toContain("block");
   });
@@ -54,6 +60,9 @@ describe("banned_phrases", () => {
     "Holding specific dates isn't something I can do. The deposit is what secures your date request.",
     "I don't have the nightly rate for that package. It is set at checkout.",
     "I can't confirm a price for an add-on the clinic's package list doesn't show.",
+    "You apply for Klarna or PayPal at checkout. I can't apply on your behalf.",
+    "I can't adjust the number of grafts in your assessment.",
+    "I can't reduce the number of hotel nights in a package.",
   ])("passes wording the original prompt uses: %s", (response) => {
     expect(severities(response)).toEqual([]);
   });
