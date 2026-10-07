@@ -300,6 +300,34 @@ describe("answer stage: the responder's own tool calls", () => {
     expect(model.doGenerateCalls[1]?.tools?.map((tool) => tool.name)).toEqual(["getClinicPackagesTool"]);
   });
 
+  it("still offers a clinic tool after code used it for one clinic, so the model can fetch a second clinic the plan missed", async () => {
+    // The router names Heva only, and no clinic name in the text matches Dr. Hakan Clinic.
+    const { reply, trace, model } = await run("What does Heva charge, and what about the other clinic you matched me with?", [
+      routed({ entities: { clinics: ["Heva Clinic"] } }),
+      toolCall("getClinicPackagesTool", { clinicName: "Dr. Hakan Clinic" }),
+      drafted({
+        response:
+          "Heva's Silver is $3,000 with a $500 deposit, and Gold is $4,500 with a $600 deposit. Dr. Hakan Clinic's Sapphire is $3,200 with a $500 deposit.",
+      }),
+    ]);
+
+    // Code fetched packages for the one clinic it knew about.
+    const byCode = trace.toolCalls.filter((call) => call.name === "getClinicPackagesTool" && call.source === "prefetch");
+    expect(byCode).toHaveLength(1);
+
+    // The same tool is still offered, because its input can differ. A tool with only one possible input is not.
+    const offered = model.doGenerateCalls[1]?.tools?.map((tool) => tool.name) ?? [];
+    expect(offered).toContain("getClinicPackagesTool");
+    expect(offered).not.toContain("getAllClinicsTool");
+    expect(trace.toolCalls.some((call) => call.name === "getAllClinicsTool")).toBe(true);
+
+    // The model's call for the second clinic ran, and the price it returned counts as grounded.
+    expect(trace.toolCalls.filter((call) => call.source === "responder").map((call) => call.input)).toEqual([{ clinicName: "Dr. Hakan Clinic" }]);
+    expect(trace.validation[0]?.violations.filter((violation) => violation.severity === "block")).toEqual([]);
+    expect(reply.escalate).toBe(false);
+    expect(reply.response).toContain("$3,200");
+  });
+
   it("lets the model fetch a fact code did not, and records the call", async () => {
     const { reply, trace } = await run("Is winter a busy time for the clinics?", [
       datesQuestion(),
@@ -335,6 +363,50 @@ describe("answer stage: the responder's own tool calls", () => {
     expect(facts.split('## getClinicPackagesTool({"clinicName":"Heva Clinic"})')).toHaveLength(2);
     expect(facts.split('## getClinicPackagesTool({"clinicName":"Dr. Hakan Clinic"})')).toHaveLength(2);
     expect(systemText(model, 1)).not.toContain("## getClinicPackagesTool(");
+  });
+
+  it("checks the answer from the call without tools like any other draft, and repairs it once", async () => {
+    const { reply, trace, model } = await run("Is winter a busy time for the clinics?", [
+      datesQuestion(),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Dr. Hakan Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      drafted({ response: "Winter is busy, and a January date costs $9,999." }),
+      drafted({ response: WINTER_ANSWER }),
+    ]);
+
+    // The answer from the call without tools went through the validators, and one of them blocked it.
+    expect(trace.validation.map((entry) => [entry.attempt, entry.violations.filter((violation) => violation.severity === "block").map((violation) => violation.validator)])).toEqual([
+      [1, ["price_grounding"]],
+      [2, []],
+    ]);
+    expect(reply).toMatchObject({ escalate: false, response: WINTER_ANSWER });
+    expect(trace.repairAttempts).toBe(1);
+
+    // Every call is in the trace. This is the longest path the packet's data allows: six model calls.
+    // A long call history adds one call by the subtask, which makes seven.
+    expect(trace.modelCalls.map((call) => [call.stage, call.steps])).toEqual([
+      ["router", 1],
+      ["responder", 3],
+      ["responder", 1],
+      ["repair", 1],
+    ]);
+    expect(model.doGenerateCalls).toHaveLength(6);
+  });
+
+  it("hands the message to a person when the answer without tools fails its repair as well, with no further call", async () => {
+    const { reply, trace, model } = await run("Is winter a busy time for the clinics?", [
+      datesQuestion(),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      toolCall("getClinicPackagesTool", { clinicName: "Heva Clinic" }),
+      drafted({ response: "Winter is busy, and a January date costs $9,999." }),
+      drafted({ response: "Winter is busy, and a January date costs $8,888." }),
+    ]);
+
+    expect(reply).toMatchObject({ escalate: true, response: HANDOFF_SENTENCE });
+    expect(trace.failure?.cause).toBe("validator");
+    expect(model.doGenerateCalls).toHaveLength(6);
   });
 
   it("still hands the message to a person when the call without tools fails too", async () => {
