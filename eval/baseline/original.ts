@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { z } from "zod";
 import type { ModelConfig } from "../../config/models";
 import * as constants from "../../src/context/packet";
-import { callModel, type LlmDeps, type LlmTool } from "../../src/llm/client";
+import { callModel, LlmError, type LlmDeps, type LlmTool } from "../../src/llm/client";
 import { isFatal, toFailure, toFatal } from "../../src/pipeline/errors";
 import { fillPrompt, loadPrompt } from "../../src/prompts";
 import {
@@ -189,12 +189,14 @@ export async function runBaselineCase(
   } catch (error) {
     if (isFatal(error)) throw toFatal(error);
     const failure = toFailure(error);
+    // A run to the step limit produced no reply, but it was paid for, so it stays in the token counts.
+    const spent = error instanceof LlmError ? error.spentAtStepLimit : undefined;
     return {
       ...common,
       reply: null,
       failure,
       toolCalls: [],
-      modelCalls: [],
+      modelCalls: spent ? [toModelCallTrace("responder", spent)] : [],
       latencyMs: Date.now() - started,
       result: {
         id: testCase.id,

@@ -75,7 +75,7 @@ console.log(`| Original prompt, sent whole on every request | ${thousands(origin
 console.log(`| This system, responder, average per answered message | ${thousands(average((row) => row.responderChars))} | ${thousands(average((row) => row.responderTokens))} (measured) |`);
 console.log(`| This system, router, average per answered message | ${thousands(average((row) => row.routerChars))} | ${thousands(average((row) => row.routerTokens))} (measured) |`);
 console.log(`| This system, a message the guard escalates | 0 | 0 |`);
-console.log(`\nThe token estimate for the original prompt uses ${charsPerToken.toFixed(2)} characters per token, the rate measured on this system's own responder calls, which are made of the same text. Measured responder tokens include tool definitions and the output schema, which the character count leaves out, so the estimate for the original prompt is on the low side.`);
+console.log(`\nThe token estimate for the original prompt uses ${charsPerToken.toFixed(2)} characters per token, the rate measured on this system's own responder calls, which are made of the same text. Measured responder tokens include tool definitions and the output schema, which the character count leaves out, so the rate is too low and the estimate runs high. \`npm run baseline\` measures the real figure: 60,310 tokens with the 14 tool definitions, on 2026-10-07.`);
 console.log(`\nThe original flow also re-sends its whole prompt on every tool round trip within one reply. This system fetches facts in code, so an answered message is one responder call unless a repair is needed.\n`);
 
 const packetIds = new Set(["heva-packages", "hakan-price", "consultation"]);

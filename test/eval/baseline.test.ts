@@ -202,6 +202,16 @@ describe("one eval case through the original flow", () => {
     expect(record.result.failures[0]).toMatch(/^no reply: invalid_output/);
   });
 
+  it("keeps the tokens of a case that ran to the step limit without a reply", async () => {
+    const model = new MockLanguageModelV4({ doGenerate: toolCall("getAllClinicsTool", {}) });
+    const record = await runBaselineCase(evalCase({ escalate: false }), SYSTEM, { config, model });
+
+    expect(record.reply).toBeNull();
+    expect(record.result.failures).toEqual(["no reply: invalid_output: The model was still calling tools at the step limit."]);
+    expect(record.modelCalls).toHaveLength(1);
+    expect(record.modelCalls[0]).toMatchObject({ steps: ORIGINAL_MAX_STEPS, cacheReadTokens: 900 * ORIGINAL_MAX_STEPS });
+  });
+
   it("stops the run when the account is out of credit", async () => {
     const model = new MockLanguageModelV4({
       doGenerate: async () => {
