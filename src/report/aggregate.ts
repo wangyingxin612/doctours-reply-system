@@ -24,7 +24,8 @@ export function wilson(successes: number, total: number): [number, number] {
   return [Math.max(0, center - margin), Math.min(1, center + margin)];
 }
 
-function percentile(sorted: readonly number[], fraction: number): number {
+/** The value at `fraction` of the way through a list sorted from low to high. */
+export function percentile(sorted: readonly number[], fraction: number): number {
   if (sorted.length === 0) return 0;
   return sorted[Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1)] ?? 0;
 }

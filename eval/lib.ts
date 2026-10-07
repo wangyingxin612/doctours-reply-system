@@ -3,7 +3,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
-import type { Trace } from "../src/trace/types";
+import { costOf } from "../config/pricing";
+import { percentile } from "../src/report/aggregate";
+import type { ModelCallTrace, Trace } from "../src/trace/types";
 import { caseSchema, type CaseResult, type EvalCase } from "./assert";
 
 const EVAL_DIR = import.meta.dirname;
@@ -37,8 +39,31 @@ export interface CaseRuns {
   runs: CaseResult[];
 }
 
+/** The parts of a trace the printed results read. A baseline record has them too. */
+export type RunRecord = Pick<Trace, "failure" | "modelCalls" | "repairAttempts" | "latencyMs">;
+
+const inputOf = (calls: readonly ModelCallTrace[]) =>
+  calls.reduce((sum, call) => sum + call.inputTokens + call.cacheReadTokens + call.cacheWriteTokens, 0);
+
+/** Dollars for a set of calls, as run and as if every input token had been billed at the full rate. */
+function costsOf(calls: readonly ModelCallTrace[]): { asRun: number; uncached: number; unpriced: string[] } {
+  const unpriced = new Set<string>();
+  let asRun = 0;
+  let uncached = 0;
+  for (const call of calls) {
+    const cost = costOf(call);
+    if (cost === null) {
+      unpriced.add(call.model);
+      continue;
+    }
+    asRun += cost;
+    uncached += costOf({ ...call, inputTokens: inputOf([call]), cacheReadTokens: 0, cacheWriteTokens: 0 }) ?? 0;
+  }
+  return { asRun, uncached, unpriced: [...unpriced] };
+}
+
 /** Prints the results of a run. Returns true when every case passed on every run. */
-export function report(cases: readonly CaseRuns[], traces: readonly Trace[], repeat: number): boolean {
+export function report(cases: readonly CaseRuns[], traces: readonly RunRecord[], repeat: number): boolean {
   for (const { testCase, runs } of cases) {
     const passed = runs.filter((run) => run.passed).length;
     const label = passed === runs.length ? "PASS" : passed === 0 ? "FAIL" : "FLAKY";
@@ -89,21 +114,25 @@ export function report(cases: readonly CaseRuns[], traces: readonly Trace[], rep
     console.log(`  cases that pass on some runs only  ${unstable.length}/${cases.length}`);
   }
 
-  const answered = traces.filter((trace) => trace.modelCalls.length > 0);
-  const tokens = (stage: string) =>
-    answered.reduce(
-      (sum, trace) =>
-        sum +
-        trace.modelCalls
-          .filter((call) => (stage === "router" ? call.stage === "router" : call.stage !== "router"))
-          .reduce((inner, call) => inner + call.inputTokens + call.cacheReadTokens + call.cacheWriteTokens, 0),
-      0,
-    );
-  if (answered.length > 0) {
+  const reached = traces.filter((trace) => trace.modelCalls.length > 0);
+  if (reached.length > 0) {
+    const calls = reached.flatMap((trace) => trace.modelCalls);
+    const router = calls.filter((call) => call.stage === "router");
+    const others = calls.filter((call) => call.stage !== "router");
     console.log("\nModel input per message that reached a model:");
-    console.log(`  router     ${Math.round(tokens("router") / answered.length)} tokens`);
-    console.log(`  responder  ${Math.round(tokens("responder") / answered.length)} tokens (cached and uncached)`);
+    if (router.length > 0) console.log(`  router     ${Math.round(inputOf(router) / reached.length)} tokens`);
+    console.log(`  responder  ${Math.round(inputOf(others) / reached.length)} tokens (cached and uncached)`);
     console.log(`  repairs    ${traces.filter((trace) => trace.repairAttempts > 0).length} of ${traces.length} messages`);
+
+    const cost = costsOf(calls);
+    const each = (total: number) => `${(total / traces.length).toFixed(4)} per message`;
+    const latencies = reached.map((trace) => trace.latencyMs).sort((a, b) => a - b);
+    const seconds = (fraction: number) => `${(percentile(latencies, fraction) / 1000).toFixed(1)} s`;
+    console.log("\nCost and speed:");
+    console.log(`  cost       ${cost.asRun.toFixed(2)} for ${traces.length} messages, ${each(cost.asRun)}`);
+    console.log(`  no cache   ${cost.uncached.toFixed(2)}, ${each(cost.uncached)}, if every input token were billed at the full rate`);
+    if (cost.unpriced.length > 0) console.log(`  not priced ${cost.unpriced.join(", ")}: those calls are not in the cost`);
+    console.log(`  latency    p50 ${seconds(0.5)}, p95 ${seconds(0.95)} for messages that reached a model`);
   }
 
   const passedCases = cases.filter(({ runs }) => runs.every((run) => run.passed)).length;
