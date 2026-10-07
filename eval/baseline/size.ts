@@ -81,7 +81,8 @@ console.log(`\nThe original flow also re-sends its whole prompt on every tool ro
 const packetIds = new Set(["heva-packages", "hakan-price", "consultation"]);
 console.log(`| Message | Skills loaded | Responder characters | Responder tokens (measured) | Share of the original prompt |`);
 console.log(`| --- | --- | --- | --- | --- |`);
-for (const row of rows.filter((candidate) => packetIds.has(candidate.id))) {
+// A repeated run names its messages "<id>#<round>". The first round stands for the message.
+for (const row of rows.filter((candidate) => packetIds.has(candidate.id.replace(/#1$/, "")))) {
   console.log(`| ${row.id} | ${row.skills} | ${thousands(row.responderChars)} | ${thousands(row.responderTokens)} | ${((100 * row.responderChars) / originalChars).toFixed(0)}% |`);
 }
 const smallest = rows.reduce((a, b) => (a.responderChars < b.responderChars ? a : b));
