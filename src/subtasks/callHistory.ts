@@ -9,6 +9,7 @@ import { callModel, type LlmDeps } from "../llm/client";
 import { loadPrompt } from "../prompts";
 import type { TurnLedger } from "../tools/ledger";
 import type { ModelCallTrace } from "../trace/types";
+import { toModelCallTrace } from "../trace/write";
 
 /** Below this many characters of call text, extraction would cost more than it saves. */
 export const DIRECT_LIMIT_CHARS = 4000;
@@ -70,12 +71,6 @@ export async function readCallHistory(
       title: `Findings from ${calls.length} call records, extracted for this message`,
       body: findings.length > 0 ? findings.map((finding) => `- ${finding}`).join("\n") : "Nothing in the call records bears on this message.",
     },
-    call: {
-      stage: "subtask",
-      model: extracted.model,
-      ...extracted.usage,
-      steps: extracted.steps,
-      latencyMs: extracted.latencyMs,
-    },
+    call: toModelCallTrace("subtask", extracted),
   };
 }

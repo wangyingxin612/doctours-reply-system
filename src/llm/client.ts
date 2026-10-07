@@ -11,6 +11,7 @@ import {
   type LanguageModel,
   type ToolSet,
 } from "ai";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { z } from "zod";
 import { loadModelConfig, type ModelConfig } from "../../config/models";
 
@@ -61,7 +62,10 @@ export interface LlmSpend {
   steps: number;
   /** The model that answered. Differs from the requested model only if a fallback served the turn. */
   model: string;
+  /** Includes the time spent waiting between retries. */
   latencyMs: number;
+  /** HTTP status of each attempt that failed and was retried. 0 means the request got no response. */
+  failedAttempts: number[];
 }
 
 export interface LlmResult<T> extends LlmSpend {
@@ -115,12 +119,28 @@ const DEFAULT_MAX_OUTPUT_TOKENS: Record<LlmRole, number> = {
   responder: 8000,
 };
 
+/** Failed HTTP attempts of the call in progress. The SDK retries inside one call and reports none of it. */
+const failedAttemptLog = new AsyncLocalStorage<number[]>();
+
+/** fetch, with every failed attempt noted, so a slow call can be told apart from a retried one. */
+const recordingFetch: typeof fetch = async (input, init) => {
+  const failed = failedAttemptLog.getStore();
+  try {
+    const response = await fetch(input, init);
+    if (!response.ok) failed?.push(response.status);
+    return response;
+  } catch (error) {
+    failed?.push(0);
+    throw error;
+  }
+};
+
 function resolveModel(role: LlmRole, config: ModelConfig): LanguageModel {
   const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
   if (!apiKey) {
     throw new LlmError("auth", "ANTHROPIC_API_KEY is not set. Put it in .env or export it.");
   }
-  const anthropic = createAnthropic({ apiKey });
+  const anthropic = createAnthropic({ apiKey, fetch: recordingFetch });
   return anthropic(role === "router" ? config.routerModel : config.responderModel);
 }
 
@@ -198,19 +218,22 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
           } satisfies AnthropicLanguageModelOptions)
         : {};
 
-    const result = await generateText({
-      model,
-      instructions: toInstructions(request.system),
-      prompt: request.prompt,
-      output: Output.object({ schema: request.schema }),
-      tools: toSdkTools(request.tools),
-      stopWhen: isStepCount(request.maxSteps ?? 1),
-      maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS[request.role],
-      maxRetries: config.maxRetries,
-      // The responder model rejects any non-default temperature, so only the router sets one.
-      ...(request.role === "router" ? { temperature: 0 } : {}),
-      providerOptions: { anthropic: anthropicOptions },
-    });
+    const failedAttempts: number[] = [];
+    const result = await failedAttemptLog.run(failedAttempts, () =>
+      generateText({
+        model,
+        instructions: toInstructions(request.system),
+        prompt: request.prompt,
+        output: Output.object({ schema: request.schema }),
+        tools: toSdkTools(request.tools),
+        stopWhen: isStepCount(request.maxSteps ?? 1),
+        maxOutputTokens: request.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS[request.role],
+        maxRetries: config.maxRetries,
+        // The responder model rejects any non-default temperature, so only the router sets one.
+        ...(request.role === "router" ? { temperature: 0 } : {}),
+        providerOptions: { anthropic: anthropicOptions },
+      }),
+    );
 
     if (result.finishReason === "content-filter") {
       throw new LlmError("refusal", "The model declined the request (stop reason: refusal).");
@@ -228,6 +251,7 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
       steps: result.steps.length,
       model: result.response.modelId,
       latencyMs: Date.now() - started,
+      failedAttempts,
     };
 
     if (result.finishReason === "tool-calls") {

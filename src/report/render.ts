@@ -93,6 +93,18 @@ function costSection(run: RunSummary): string[] {
     "",
     `Latency: p50 ${run.latencyMs.p50} ms and p95 ${run.latencyMs.p95} ms over all messages. For answered messages, p50 ${run.latencyMs.answeredP50} ms and p95 ${run.latencyMs.answeredP95} ms.`,
   );
+  if (run.retries.ofCalls > 0) {
+    const causes = Object.entries(run.retries.byStatus)
+      .sort((a, b) => b[1] - a[1])
+      .map(([status, attempts]) => `${status}: ${attempts}`)
+      .join(", ");
+    lines.push(
+      "",
+      run.retries.calls === 0
+        ? `None of the ${run.retries.ofCalls} model calls needed a retry.`
+        : `${run.retries.calls} of ${run.retries.ofCalls} model calls got through only after a retry (failed attempts: ${causes}). A retry waits before it tries again, so API trouble that retries absorb shows up here and in the latency, not in the escalation rate.`,
+    );
+  }
   return lines;
 }
 

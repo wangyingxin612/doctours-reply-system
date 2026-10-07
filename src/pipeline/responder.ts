@@ -20,6 +20,7 @@ import type { ExtraFact } from "../subtasks/callHistory";
 import type { TurnLedger } from "../tools/ledger";
 import { TOOL_REGISTRY, type ToolDefinition } from "../tools/registry";
 import type { ModelStage } from "../trace/types";
+import { toModelCallTrace } from "../trace/write";
 import { blocking, runValidators, type ValidationContext } from "../validators";
 import { ReplyRejectedError } from "./errors";
 import { hasFixedInput, type Plan } from "./plan";
@@ -192,13 +193,7 @@ function validationContext(input: ResponderInput): ValidationContext {
 }
 
 function recordCall(record: TurnRecord, stage: ModelStage, spend: LlmSpend): void {
-  record.modelCalls.push({
-    stage,
-    model: spend.model,
-    ...spend.usage,
-    steps: spend.steps,
-    latencyMs: spend.latencyMs,
-  });
+  record.modelCalls.push(toModelCallTrace(stage, spend));
 }
 
 /**

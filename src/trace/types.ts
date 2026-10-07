@@ -35,7 +35,10 @@ export interface ModelCallTrace {
   outputTokens: number;
   reasoningTokens: number;
   steps: number;
+  /** Includes the time spent waiting between retries. */
   latencyMs: number;
+  /** HTTP status of each attempt that failed and was retried. 0 means no response. Absent when none failed. */
+  failedAttempts?: number[];
 }
 
 export interface ToolCallTrace {

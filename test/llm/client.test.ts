@@ -1,6 +1,6 @@
 import { APICallError, RetryError } from "ai";
 import { MockLanguageModelV4 } from "ai/test";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import type { ModelConfig } from "../../config/models";
 import { callModel, LlmError, type LlmRequest } from "../../src/llm/client";
@@ -57,6 +57,8 @@ async function failure(promise: Promise<unknown>): Promise<LlmError> {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("callModel", () => {
@@ -243,5 +245,135 @@ describe("callModel", () => {
       const error = await failure(callModel(request("responder"), { config, model }));
       expect(error.failureCause).toBe(expected);
     }
+  });
+});
+
+// These go through the real provider, with fetch replaced, so the request and the retries are the SDK's own.
+describe("callModel over HTTP", () => {
+  const live: ModelConfig = { ...config, routerModel: "claude-haiku-4-5-20251001", responderModel: "claude-sonnet-5-5", maxRetries: 3 };
+
+  const overloaded = () =>
+    new Response(JSON.stringify({ type: "error", error: { type: "overloaded_error", message: "Overloaded" } }), {
+      status: 529,
+      headers: { "content-type": "application/json" },
+    });
+
+  const answered = () =>
+    new Response(
+      JSON.stringify({
+        id: "msg_test",
+        type: "message",
+        role: "assistant",
+        model: "claude-sonnet-5-5",
+        content: [{ type: "text", text: '{"answer":"hi"}' }],
+        stop_reason: "end_turn",
+        stop_sequence: null,
+        usage: { input_tokens: 12, output_tokens: 6 },
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+
+  function stubFetch(...responses: Array<() => Response | Error>) {
+    const fetchMock = vi.fn<typeof fetch>();
+    for (const response of responses) {
+      fetchMock.mockImplementationOnce(async () => {
+        const next = response();
+        if (next instanceof Error) throw next;
+        return next;
+      });
+    }
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  const bodyOf = (fetchMock: ReturnType<typeof stubFetch>, call = 0) =>
+    JSON.parse(String(fetchMock.mock.calls[call]?.[1]?.body)) as Record<string, any>;
+
+  beforeEach(() => {
+    vi.stubEnv("ANTHROPIC_API_KEY", "test-key");
+    vi.useFakeTimers();
+  });
+
+  it("sends the responder's request with effort, a schema, a cache mark and no temperature", async () => {
+    const fetchMock = stubFetch(answered);
+    const result = await callModel(request("responder"), { config: live });
+    const body = bodyOf(fetchMock);
+
+    expect(result.output).toEqual({ answer: "hi" });
+    expect(body.model).toBe("claude-sonnet-5-5");
+    expect(body.output_config).toMatchObject({ effort: "low", format: { type: "json_schema" } });
+    expect(body.system).toEqual([{ type: "text", text: "You answer in JSON.", cache_control: { type: "ephemeral" } }]);
+    expect(body).not.toHaveProperty("temperature");
+    expect(body).not.toHaveProperty("thinking");
+  });
+
+  it("sends the router's request at temperature 0 and with no effort", async () => {
+    const fetchMock = stubFetch(answered);
+    await callModel(request("router"), { config: live });
+    const body = bodyOf(fetchMock);
+
+    expect(body.model).toBe("claude-haiku-4-5-20251001");
+    expect(body.temperature).toBe(0);
+    expect(body.output_config).not.toHaveProperty("effort");
+  });
+
+  it("never forces a tool, which the responder model rejects", async () => {
+    const fetchMock = stubFetch(answered);
+    await callModel(
+      {
+        ...request("responder"),
+        tools: { lookupTool: { description: "Look up a record.", inputSchema: z.object({ name: z.string() }), execute: () => ({}) } },
+        maxSteps: 3,
+      },
+      { config: live },
+    );
+
+    expect(bodyOf(fetchMock).tool_choice).toEqual({ type: "auto" });
+  });
+
+  it("notes each failed attempt that a retry got past", async () => {
+    const fetchMock = stubFetch(overloaded, overloaded, answered);
+
+    const pending = callModel(request("responder"), { config: live });
+    await vi.advanceTimersByTimeAsync(60_000);
+    const result = await pending;
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(result.output).toEqual({ answer: "hi" });
+    expect(result.failedAttempts).toEqual([529, 529]);
+  });
+
+  it("notes nothing for a call that gets through at once", async () => {
+    stubFetch(answered);
+    expect((await callModel(request("responder"), { config: live })).failedAttempts).toEqual([]);
+  });
+
+  it("retries a request that got no response, and notes it as status 0", async () => {
+    // What a dropped connection looks like: fetch fails, and the cause says why.
+    const fetchMock = stubFetch(() => new TypeError("fetch failed", { cause: new Error("socket hang up") }), answered);
+
+    const pending = callModel(request("responder"), { config: live });
+    await vi.advanceTimersByTimeAsync(60_000);
+
+    expect((await pending).failedAttempts).toEqual([0]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("stops at once on an empty account, without retrying", async () => {
+    const fetchMock = stubFetch(
+      () =>
+        new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." },
+          }),
+          { status: 400, headers: { "content-type": "application/json" } },
+        ),
+    );
+
+    const error = await failure(callModel(request("responder"), { config: live }));
+
+    expect(error.failureCause).toBe("billing");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

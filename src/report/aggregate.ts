@@ -4,7 +4,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { costOf } from "../../config/pricing";
 import { GUARD_INTENT, type GuardReasonCode } from "../pipeline/guard";
-import type { Trace } from "../trace/types";
+import type { ModelCallTrace, Trace } from "../trace/types";
 
 export function loadRun(dir: string): Trace[] {
   return readdirSync(dir)
@@ -75,6 +75,18 @@ export interface RunSummary {
   cost: { total: number; perMessage: number; unpricedModels: string[] };
   tokens: Record<string, StageTokens>;
   latencyMs: { p50: number; p95: number; answeredP50: number; answeredP95: number };
+  /** Model calls that got through only after a retry, and the HTTP statuses that caused the retries. */
+  retries: { calls: number; ofCalls: number; byStatus: Record<string, number> };
+}
+
+/** How many model calls needed a retry, and why. Status 0 is a request that got no response. */
+export function retriesOf(calls: readonly ModelCallTrace[]): RunSummary["retries"] {
+  const failed = calls.flatMap((call) => call.failedAttempts ?? []);
+  return {
+    calls: calls.filter((call) => (call.failedAttempts?.length ?? 0) > 0).length,
+    ofCalls: calls.length,
+    byStatus: count(failed.map((status) => (status === 0 ? "no response" : `HTTP ${status}`))),
+  };
 }
 
 export function summarize(traces: readonly Trace[]): RunSummary {
@@ -132,5 +144,6 @@ export function summarize(traces: readonly Trace[]): RunSummary {
       answeredP50: percentile(answeredLatencies, 0.5),
       answeredP95: percentile(answeredLatencies, 0.95),
     },
+    retries: retriesOf(traces.flatMap((trace) => trace.modelCalls)),
   };
 }

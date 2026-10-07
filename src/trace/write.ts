@@ -1,7 +1,8 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import type { LlmSpend } from "../llm/client";
 import type { ToolCallRecord } from "../tools/ledger";
-import type { ToolCallTrace, Trace } from "./types";
+import type { ModelCallTrace, ModelStage, ToolCallTrace, Trace } from "./types";
 
 function describeValue(value: unknown): string {
   if (value === null || value === undefined) return "null";
@@ -28,6 +29,18 @@ export function toToolCallTraces(calls: readonly ToolCallRecord[]): ToolCallTrac
     input: call.input,
     result: summarizeResult(call.output),
   }));
+}
+
+/** One model call as the trace keeps it. */
+export function toModelCallTrace(stage: ModelStage, spend: LlmSpend): ModelCallTrace {
+  return {
+    stage,
+    model: spend.model,
+    ...spend.usage,
+    steps: spend.steps,
+    latencyMs: spend.latencyMs,
+    ...(spend.failedAttempts.length > 0 ? { failedAttempts: spend.failedAttempts } : {}),
+  };
 }
 
 /** File name for a trace: position in the input, then the message id made safe for a file system. */

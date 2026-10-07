@@ -19,7 +19,7 @@ import {
 import { TurnLedger } from "../../src/tools/ledger";
 import { TOOL_NAMES, TOOL_REGISTRY, type ToolDefinition } from "../../src/tools/registry";
 import type { ModelCallTrace, ToolCallTrace } from "../../src/trace/types";
-import { toToolCallTraces } from "../../src/trace/write";
+import { toModelCallTrace, toToolCallTraces } from "../../src/trace/write";
 import { checkCase, type CaseResult, type EvalCase } from "../assert";
 import type { LoadedCase, RunRecord } from "../lib";
 
@@ -144,7 +144,7 @@ export async function answerWithOriginalPrompt(
   const { response, escalate, escalationReason, ...rest } = result.output;
   return {
     reply: { response: response.replace(/\r\n/g, "\n").trim(), escalate, escalationReason, templateId: null, ...rest },
-    modelCall: { stage: "responder", model: result.model, ...result.usage, steps: result.steps, latencyMs: result.latencyMs },
+    modelCall: toModelCallTrace("responder", result),
     toolCalls: toToolCallTraces(ledger.calls),
   };
 }

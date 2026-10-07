@@ -139,6 +139,29 @@ describe("run summary", () => {
     expect(priced.tokens.responder).toMatchObject({ calls: 2, input: 2000, output: 200 });
   });
 
+  it("counts the model calls that needed a retry, by what failed", () => {
+    const call = (failedAttempts?: number[]) => ({
+      stage: "router" as const,
+      model: "claude-haiku-4-5-20251001",
+      inputTokens: 10,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 5,
+      reasoningTokens: 0,
+      steps: 1,
+      latencyMs: 10,
+      ...(failedAttempts ? { failedAttempts } : {}),
+    });
+    const retried = summarize([
+      trace({ intent: "a", modelCalls: [call(), call([529, 529])] }),
+      trace({ intent: "a", modelCalls: [call([0]), call()] }),
+    ]);
+
+    expect(retried.retries).toEqual({ calls: 2, ofCalls: 4, byStatus: { "HTTP 529": 2, "no response": 1 } });
+    expect(renderReport(retried)).toContain("2 of 4 model calls got through only after a retry (failed attempts: HTTP 529: 2, no response: 1)");
+    expect(renderReport(summarize([trace({ intent: "a", modelCalls: [call()] })]))).toContain("None of the 1 model calls needed a retry.");
+  });
+
   it("gives a guard decision its intent even in a trace that recorded none", () => {
     const old = { ...trace({ intent: "x", code: "HUMAN_REQUESTED", decidedBy: "guard" }), primaryIntent: null };
     expect(intentOf(old)).toBe("human_request");

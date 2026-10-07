@@ -9,6 +9,7 @@ import { ACTION_CATALOG, ACTION_TYPES, type ActionType } from "../policy/actions
 import { fillPrompt, loadPrompt } from "../prompts";
 import type { SkillSet } from "../skills/loader";
 import type { ModelCallTrace } from "../trace/types";
+import { toModelCallTrace } from "../trace/write";
 
 /** One label per message. The Monday report splits the escalation rate by these. */
 export const INTENTS = [
@@ -128,14 +129,5 @@ export async function runRouter(input: RouterInput, deps: LlmDeps = {}): Promise
     selfServe: unique(result.output.selfServe),
   };
 
-  return {
-    output,
-    call: {
-      stage: "router",
-      model: result.model,
-      ...result.usage,
-      steps: result.steps,
-      latencyMs: result.latencyMs,
-    },
-  };
+  return { output, call: toModelCallTrace("router", result) };
 }
