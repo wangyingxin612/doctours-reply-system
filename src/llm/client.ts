@@ -70,11 +70,15 @@ export interface LlmResult<T> {
 /**
  * transient_api: 429, 5xx, overloaded or network, after retries ran out.
  * auth: the key is missing or rejected. The run cannot continue.
+ * billing: the account has no credit left. The run cannot continue.
  * refusal: the model's safety classifiers declined the request.
  * invalid_output: the reply did not match the schema.
  * model_error: any other API or SDK failure.
  */
-export type LlmFailureCause = "transient_api" | "auth" | "refusal" | "invalid_output" | "model_error";
+export type LlmFailureCause = "transient_api" | "auth" | "billing" | "refusal" | "invalid_output" | "model_error";
+
+/** The API reports an empty account as a plain 400, so it has to be recognized by its message. */
+const OUT_OF_CREDIT = /credit balance|purchase credits|billing/i;
 
 export class LlmError extends Error {
   readonly failureCause: LlmFailureCause;
@@ -140,6 +144,12 @@ function classifyError(error: unknown): LlmError {
     const { statusCode } = root;
     if (statusCode === 401 || statusCode === 403) {
       return new LlmError("auth", `The API rejected the key (HTTP ${statusCode}).`, { statusCode, cause: error });
+    }
+    if (OUT_OF_CREDIT.test(root.message) || OUT_OF_CREDIT.test(root.responseBody ?? "")) {
+      return new LlmError("billing", "The API account is out of credit. Add credit and run again.", {
+        statusCode,
+        cause: error,
+      });
     }
     if (root.isRetryable) {
       const where = statusCode === undefined ? "network error" : `HTTP ${statusCode}`;

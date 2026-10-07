@@ -183,6 +183,16 @@ describe("callModel", () => {
       [apiError(undefined, true), "transient_api"],
       [new RetryError({ message: "gave up", reason: "maxRetriesExceeded", errors: [apiError(503, true)] }), "transient_api"],
       [apiError(401, false), "auth"],
+      [
+        new APICallError({
+          message: "Your credit balance is too low to access the Anthropic API.",
+          url: "https://example.invalid/v1/messages",
+          requestBodyValues: {},
+          statusCode: 400,
+          isRetryable: false,
+        }),
+        "billing",
+      ],
       [apiError(400, false), "model_error"],
       [new Error("boom"), "model_error"],
     ];

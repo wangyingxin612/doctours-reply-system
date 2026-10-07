@@ -2,7 +2,7 @@ import { LlmError } from "../llm/client";
 import type { FailureCause } from "../trace/types";
 import type { Violation } from "../validators/types";
 
-/** The run cannot continue, for example because the API key is missing or rejected. */
+/** The run cannot continue: the API key is missing or rejected, or the account is out of credit. */
 export class FatalRunError extends Error {
   constructor(message: string, options?: { cause?: unknown }) {
     super(message, options);
@@ -21,8 +21,13 @@ export class ReplyRejectedError extends Error {
   }
 }
 
+/** Causes that would fail every message the same way. Escalating them all would hide the real problem. */
+function stopsTheRun(error: LlmError): boolean {
+  return error.failureCause === "auth" || error.failureCause === "billing";
+}
+
 export function isFatal(error: unknown): boolean {
-  return error instanceof FatalRunError || (error instanceof LlmError && error.failureCause === "auth");
+  return error instanceof FatalRunError || (error instanceof LlmError && stopsTheRun(error));
 }
 
 export function toFatal(error: unknown): FatalRunError {
@@ -35,6 +40,8 @@ export function toFatal(error: unknown): FatalRunError {
 export function toFailure(error: unknown): { cause: FailureCause; detail: string } {
   const detail = error instanceof Error ? error.message : String(error);
   if (error instanceof ReplyRejectedError) return { cause: "validator", detail };
-  if (error instanceof LlmError && error.failureCause !== "auth") return { cause: error.failureCause, detail };
+  if (error instanceof LlmError && !stopsTheRun(error)) {
+    return { cause: error.failureCause as FailureCause, detail };
+  }
   return { cause: "internal_error", detail };
 }

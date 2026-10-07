@@ -142,6 +142,15 @@ describe("runMessage", () => {
     );
   });
 
+  it("stops the run when the account is out of credit, instead of escalating every message", async () => {
+    const answer: AnswerStage = async () => {
+      throw new LlmError("billing", "The API account is out of credit.");
+    };
+    await expect(runMessage({ id: "m8b", text: "Is the hotel included?" }, 0, "run-1", deps(answer))).rejects.toBeInstanceOf(
+      FatalRunError,
+    );
+  });
+
   it("replaces a reply that repeats card digits", async () => {
     const answer: AnswerStage = async () => ({ reply: answered("The card ending in 1881 was declined."), decision: noEscalation });
     const { reply, trace } = await runMessage(
