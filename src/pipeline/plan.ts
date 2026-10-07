@@ -24,6 +24,11 @@ export interface Directives {
   clarifyPackage: string[] | null;
   /** The patient asked who or what they are talking to. The core rules have the answer: name and role. */
   identityQuestion: boolean;
+  /**
+   * The patient passed on a price a clinic quoted them directly. The reply acknowledges it and gives
+   * the Doctours price. It says nothing about whether the quote can be matched.
+   */
+  clinicQuote: boolean;
 }
 
 /** One entry per place where code chose between rules. Written to the trace. */
@@ -125,6 +130,8 @@ const INTENT_STEP: Partial<Record<Intent, SelfServeStep>> = {
 };
 
 const PAUSE_SKILL = "pause-followup";
+/** Holds the original prompt's rule for a price a clinic quoted the patient directly. */
+const QUOTE_SKILL = "pricing-promos";
 const INTAKE_SKILL = "intake-collection";
 
 const CONSULTATION_URL = "https://www.doctours.com/consultation";
@@ -513,6 +520,7 @@ function impliedSkills(router: RouterOutput): string[] {
     if (forTool) implied.push(forTool);
   }
   if (router.requestType === "pause") implied.push(PAUSE_SKILL);
+  if (router.sharedClinicQuote) implied.push(QUOTE_SKILL);
   if (router.entities.packageLean === "selected") implied.push("payment-deposit");
   if (router.entities.packages.length > 0) implied.push("clinic-packages");
   return implied;
@@ -553,6 +561,15 @@ export function buildPlan(input: PlanInput): Plan {
     });
   }
   precedence.push({ rule: "collection_anchor", decision: `anchor: ${anchor.anchor}. ${anchor.reason}`, beats: [] });
+  if (router.sharedClinicQuote) {
+    // The rule says never refuse the quote and never match it. Left to itself, the model announces
+    // that it cannot match, which is the refusal. So code settles it: the subject is not raised.
+    precedence.push({
+      rule: "clinic_direct_quote",
+      decision: "The patient passed on a clinic's direct quote: acknowledge it, give the Doctours price, and say nothing about matching it.",
+      beats: ["say_plainly_what_you_cannot_do"],
+    });
+  }
 
   // A revision request is a promise the reply makes. In production a detector files it for the
   // team. Here the event in the trace is what makes the promise traceable.
@@ -573,6 +590,7 @@ export function buildPlan(input: PlanInput): Plan {
       pause: pausing,
       clarifyPackage: selection.ambiguousPackages,
       identityQuestion: router.intents.includes("identity"),
+      clinicQuote: router.sharedClinicQuote,
     },
     precedence,
     policyAmounts: [...new Set(loaded.flatMap((skill) => skill.policyAmounts))],

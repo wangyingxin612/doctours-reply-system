@@ -43,6 +43,7 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     requestType: "question",
     humanRequested: false,
     requestedActions: [],
+    sharedClinicQuote: false,
     selfServe: [],
     needsCallHistory: false,
     rationale: "test",

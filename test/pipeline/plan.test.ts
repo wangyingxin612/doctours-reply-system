@@ -23,6 +23,7 @@ function routed(overrides: RouterOverrides = {}): RouterOutput {
     requestType: "question",
     humanRequested: false,
     requestedActions: [],
+    sharedClinicQuote: false,
     selfServe: [],
     needsCallHistory: false,
     rationale: "test",
@@ -271,6 +272,29 @@ describe("planner: other stages", () => {
   it("leaves the intake rules out when nothing is left to collect", () => {
     const { plan: built } = plan(routed({ skills: ["clinic-packages"] }));
     expect(built.selected.map((skill) => skill.name)).not.toContain("intake-collection");
+  });
+});
+
+describe("planner: a clinic's direct quote", () => {
+  const quoted = () => routed({ primaryIntent: "pricing_promos", intents: ["pricing_promos"], skills: [], sharedClinicQuote: true });
+
+  it("tells the responder to acknowledge the quote and give the Doctours price, and loads the rule", () => {
+    const built = plan(quoted(), "The clinic told me a lower number if I go to them directly.").plan;
+
+    expect(built.directives.clinicQuote).toBe(true);
+    expect(built.selected.map((skill) => skill.name)).toContain("pricing-promos");
+    expect(built.precedence.map((entry) => entry.rule)).toContain("clinic_direct_quote");
+  });
+
+  it("fetches the clinic's packages, so the Doctours price is in the facts", () => {
+    const { ledger } = plan(quoted(), "The clinic told me a lower number if I go to them directly.");
+    expect(ledger.calls.filter((call) => call.name === "getClinicPackagesTool" && call.source === "prefetch").length).toBeGreaterThan(0);
+  });
+
+  it("leaves the directive off for any other message", () => {
+    const built = plan(routed()).plan;
+    expect(built.directives.clinicQuote).toBe(false);
+    expect(built.precedence.map((entry) => entry.rule)).not.toContain("clinic_direct_quote");
   });
 });
 
