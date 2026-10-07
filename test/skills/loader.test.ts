@@ -55,6 +55,32 @@ describe("skill loader", () => {
     expect(body).not.toContain("{{COORDINATOR_DISPLAY_NAME}}");
   });
 
+  it("shows only the financing branch that matches the patient's flag", () => {
+    const base = buildPacketContext();
+    const withFlag = (financingEligible: "yes" | "no" | "unknown") =>
+      renderSkillBody(skills.get("financing-insurance"), { ...base, patient: { ...base.patient, financingEligible } });
+
+    const markers = { yes: "- **yes (US or Canada):**", no: "- **no (known outside the US and Canada):**", unknown: "- **unknown:**" };
+    for (const flag of ["yes", "no", "unknown"] as const) {
+      const body = withFlag(flag);
+      for (const [branch, marker] of Object.entries(markers)) {
+        expect(body.includes(marker), `${flag} patient, ${branch} branch`).toBe(branch === flag);
+      }
+      // The gate markers are for code. The model never sees them.
+      expect(body).not.toContain("<!--");
+      // Rules outside the gates are always there.
+      expect(body).toContain("# HEALTH INSURANCE (HARD RULE)");
+      expect(body).toContain("# CARECREDIT / CHERRY (HARD RULE)");
+    }
+    // A patient sees one branch of each rule, not three.
+    expect(withFlag("yes").length).toBeLessThan(skills.get("financing-insurance").body.length * 0.85);
+  });
+
+  it("declares the cancellation fee as the only policy amount", () => {
+    const amounts = skills.skills.flatMap((skill) => skill.policyAmounts.map((amount) => `${skill.name}:${amount}`));
+    expect(amounts).toEqual(["deposit-terms:25"]);
+  });
+
   it("parses frontmatter lists, numbers and values that contain colons", () => {
     const skill = parseSkill(file(valid), "sample.md");
     expect(skill).toMatchObject({

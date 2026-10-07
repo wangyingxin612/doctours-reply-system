@@ -144,7 +144,34 @@ export function loadSkills(vertical: string, root: string = SKILLS_ROOT): SkillS
   return set;
 }
 
-/** Fills the placeholders the original prompt used. Unknown placeholders are left as written. */
+const GATE_OPEN = /^<!-- when ([a-z]+)=([a-z_]+) -->$/;
+const GATE_CLOSE = "<!-- end -->";
+
+/** Patient flags a skill may gate a block on. Code knows them, so the model never has to pick a branch. */
+export function patientFlags(context: PatientContext): Record<string, string> {
+  return { financing: context.patient.financingEligible };
+}
+
+/**
+ * The text of a skill for one patient: gated blocks are kept only when their flag matches, and the
+ * placeholders the original prompt used are filled. Unknown placeholders are left as written.
+ */
 export function renderSkillBody(skill: Skill, context: PatientContext): string {
-  return skill.body.replaceAll("{{COORDINATOR_DISPLAY_NAME}}", context.coordinatorName);
+  const flags = patientFlags(context);
+  const kept: string[] = [];
+  let keeping = true;
+
+  for (const line of skill.body.split("\n")) {
+    const gate = GATE_OPEN.exec(line);
+    if (gate) {
+      const [, flag, value] = gate;
+      if (flag === undefined || !(flag in flags)) throw new Error(`${skill.name}: unknown flag in "${line}"`);
+      keeping = flags[flag] === value;
+    } else if (line === GATE_CLOSE) {
+      keeping = true;
+    } else if (keeping) {
+      kept.push(line);
+    }
+  }
+  return kept.join("\n").replaceAll("{{COORDINATOR_DISPLAY_NAME}}", context.coordinatorName);
 }
