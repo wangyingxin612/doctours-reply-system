@@ -22,7 +22,7 @@ Other commands:
 
 | Command | What it does | Needs a key |
 | --- | --- | --- |
-| `npm test` | 492 unit tests | No |
+| `npm test` | 495 unit tests | No |
 | `npm run eval` | Runs the 67 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run eval -- --recheck <runDir>` | Checks the stored replies of a past run again, against the cases as they are now | No |
 | `npm run baseline` | Runs the same cases through the original prompt, the way the packet's Flow section describes, for comparison | Yes |
@@ -287,7 +287,7 @@ The packet's five test messages and expected replies are only in `eval/packet/`.
 
 State on 2026-10-07. Every number below is from a run whose traces are in `traces/` on my machine. That folder is not in the repository.
 
-- 492 unit tests pass.
+- 495 unit tests pass.
 - The five packet messages passed on every eval run, as scored at the time. Under the machinery check described below, one of them fails on 2 of its 10 stored replies: the reply to the one-clinic price question said the clinic has a package "in my data". The validator pattern added afterwards blocks that wording.
 - **Dev set, 50 cases.** The last three runs pass 50 of 50 under the checks as they are now. As first scored, the third was 49: my check for the Medicaid case demanded the word "insurance" and failed a correct reply. I first loosened it, which left a hole, and then rewrote it to test the shape the rule asks for. In all three runs, every case that should escalate did, and none escalated that should not.
 - **The text checks are tested too.** The checks that carry a rule, for the Medicaid, CareCredit and Cherry cases, are unit-tested against replies known to be good and replies known to be bad, with no model call (`test/eval/textChecks.test.ts`). Each tests three things: the no comes in the first sentence, financing and layaway are both named, and no hedge word sits in a sentence about the subject. The three cases were then run again, three times each: 9 of 9.

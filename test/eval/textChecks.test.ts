@@ -84,6 +84,10 @@ describe("medicaid: the no first, then financing and layaway, and no hedge", () 
     "Unfortunately you can't use Medicaid or any other health insurance for a hair transplant. It's cash-pay through Doctours. We do offer financing and layaway options though: Klarna or PayPal for the remaining balance after the deposit, or interest-free layaway. Klarna or PayPal approval is up to the lender, and they show your exact terms at checkout.",
     "Unfortunately you can't use Medicaid or any other health insurance for a hair transplant. It's cash-pay through Doctours. We do offer financing and layaway options though — Klarna or PayPal for the remaining balance after the deposit, or interest-free layaway.",
     "Unfortunately you can't use Medicaid, or any health insurance, for a hair transplant. We do offer financing and layaway options though. Klarna or PayPal can cover the remaining balance after the deposit, or there's interest-free layaway.",
+    // The three replies from the run made after the checks were rewritten.
+    "Unfortunately you can't use Medicaid or any other health insurance for a hair transplant. It's cash-pay through Doctours. We do offer financing and layaway options though. Klarna or PayPal can cover the remaining balance after the deposit, or you can use interest-free layaway. Klarna and PayPal show your exact terms at checkout, and the lender approves each application.",
+    "Unfortunately you can't use Medicaid or any other health insurance for a hair transplant. The procedure is cash-pay through Doctours. We do offer financing and layaway options though. Klarna or PayPal for the remaining balance after the deposit, or interest-free layaway.",
+    "Unfortunately you can't use Medicaid for a hair transplant. It's cash-pay, and that goes for any health insurance. We do offer financing and layaway options though. Klarna or PayPal for the remaining balance after the deposit, or interest-free layaway. I also can't submit anything to an insurer.",
   ])("passes a real reply: %s", (response) => {
     expect(failuresOf("medicaid", response)).toEqual([]);
   });
