@@ -9,6 +9,11 @@ export interface ModelConfig {
   responderEffort: Effort;
   /** Retries for transient API errors (429, 5xx, overloaded, network), with exponential backoff. */
   maxRetries: number;
+  /**
+   * Server-side refusal fallback, a beta feature. When on, some refused requests are retried on an
+   * earlier model by the API. Off unless RESPONDER_FALLBACKS=default.
+   */
+  responderFallbacks: boolean;
 }
 
 export const DEFAULT_ROUTER_MODEL = "claude-haiku-4-5-20251001";
@@ -28,11 +33,19 @@ function countFromEnv(name: string, value: string | undefined, fallback: number)
   throw new Error(`${name} must be a whole number of 0 or more. Got "${value}".`);
 }
 
+function fallbacksFromEnv(value: string | undefined): boolean {
+  const setting = value?.trim().toLowerCase();
+  if (!setting || setting === "off") return false;
+  if (setting === "default") return true;
+  throw new Error(`RESPONDER_FALLBACKS must be "default" or "off". Got "${value}".`);
+}
+
 export function loadModelConfig(env: NodeJS.ProcessEnv = process.env): ModelConfig {
   return {
     routerModel: env.ROUTER_MODEL?.trim() || DEFAULT_ROUTER_MODEL,
     responderModel: env.RESPONDER_MODEL?.trim() || DEFAULT_RESPONDER_MODEL,
     responderEffort: effortFromEnv(env.RESPONDER_EFFORT),
     maxRetries: countFromEnv("LLM_MAX_RETRIES", env.LLM_MAX_RETRIES, 5),
+    responderFallbacks: fallbacksFromEnv(env.RESPONDER_FALLBACKS),
   };
 }

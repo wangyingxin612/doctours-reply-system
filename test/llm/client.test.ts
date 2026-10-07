@@ -10,6 +10,7 @@ const config: ModelConfig = {
   responderModel: "mock-responder",
   responderEffort: "low",
   maxRetries: 0,
+  responderFallbacks: false,
 };
 
 const usage = {
@@ -85,6 +86,20 @@ describe("callModel", () => {
     await callModel(request("responder"), { config, model: responder });
     expect(responder.doGenerateCalls[0]?.temperature).toBeUndefined();
     expect(responder.doGenerateCalls[0]?.providerOptions?.anthropic?.effort).toBe("low");
+  });
+
+  it("turns on the refusal fallback only when the config asks for it", async () => {
+    const off = new MockLanguageModelV4({ doGenerate: textReply('{"answer":"hi"}') });
+    await callModel(request("responder"), { config, model: off });
+    expect(off.doGenerateCalls[0]?.providerOptions?.anthropic).not.toHaveProperty("fallbacks");
+
+    const on = new MockLanguageModelV4({ doGenerate: textReply('{"answer":"hi"}') });
+    await callModel(request("responder"), { config: { ...config, responderFallbacks: true }, model: on });
+    expect(on.doGenerateCalls[0]?.providerOptions?.anthropic?.fallbacks).toBe("default");
+
+    const router = new MockLanguageModelV4({ doGenerate: textReply('{"answer":"hi"}') });
+    await callModel(request("router"), { config: { ...config, responderFallbacks: true }, model: router });
+    expect(router.doGenerateCalls[0]?.providerOptions?.anthropic).not.toHaveProperty("fallbacks");
   });
 
   it("runs a tool, then returns the structured answer within the step cap", async () => {

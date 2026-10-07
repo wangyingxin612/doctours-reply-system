@@ -171,7 +171,10 @@ export async function callModel<T>(request: LlmRequest<T>, deps: LlmDeps = {}): 
     const model = deps.model ?? resolveModel(request.role, config);
     const anthropicOptions =
       request.role === "responder"
-        ? ({ effort: config.responderEffort } satisfies AnthropicLanguageModelOptions)
+        ? ({
+            effort: config.responderEffort,
+            ...(config.responderFallbacks ? { fallbacks: "default" as const } : {}),
+          } satisfies AnthropicLanguageModelOptions)
         : {};
 
     const result = await generateText({

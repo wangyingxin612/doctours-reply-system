@@ -10,6 +10,7 @@ const config: ModelConfig = {
   responderModel: "mock-responder",
   responderEffort: "low",
   maxRetries: 0,
+  responderFallbacks: false,
 };
 
 function modelReturning(findings: string[]) {
