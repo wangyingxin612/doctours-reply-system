@@ -23,7 +23,7 @@ Other commands:
 | Command | What it does | Needs a key |
 | --- | --- | --- |
 | `npm test` | 395 unit tests | No |
-| `npm run eval` | Runs the 50 eval cases with real model calls and checks each reply. `--repeat 3` also reports how often `escalate` flips. | Yes |
+| `npm run eval` | Runs the 65 eval cases with real model calls and checks each reply. `--split dev` or `--split holdout` picks a part. `--repeat 3` also reports how often `escalate` flips. | Yes |
 | `npm run report -- <runDir> [<baselineRunDir>]` | The Monday escalation report for a run, with the change against a baseline | No |
 | `npm run size -- <runDir>` | Prompt size of this system against the original prompt | No |
 | `npm run smoke` | Checks the model settings with a few small real calls | Yes |
@@ -214,7 +214,6 @@ The levers, in order of effect:
 
 - Human labels on a sample of escalations, to measure precision in production. The eval can only measure it on cases I wrote.
 - "Asked for a human right after a bot reply" as a satisfaction signal. It needs conversation history that the packet does not provide.
-- A holdout set written after tuning and run once.
 - An effort sweep and a model swap on the responder, judged by cost per passing reply.
 - Trim `core`, and give every request the same tool list so the cached prefix is shared more widely.
 - A second vertical, to test that a new line of care really is only a new folder.
@@ -251,10 +250,10 @@ Honest state at the time of writing:
 
 - 395 unit tests pass.
 - The five packet messages passed end to end on every eval run that completed.
-- The last complete run of all 50 eval cases passed 47. Escalation was exactly right on all 50: every case that should escalate did, and none escalated that should not.
+- The last complete run of the 50 dev cases passed 47. Escalation was exactly right on all 50: every case that should escalate did, and none escalated that should not.
 - The three failures were answer details. Each has a fix in the code, with unit tests where the fix is code.
 - **Those fixes have not been re-run against the model.** The API account ran out of credit first. For the same reason the stability run (`--repeat 3`), the effort comparison, a holdout run and a full baseline run of the original prompt have not been done. `BLOCKERS.md` lists the commands to run.
-- All 50 eval cases are dev cases. I read their outputs while fixing bugs, so none of them counts as held out.
+- The first 50 eval cases are dev cases: I read their outputs while fixing bugs. Fifteen holdout cases were written afterwards and have never been run. They are to be run once and reported, not tuned on.
 - The stage skills other than `PRE_CLINICAL_SENT` and the intake rules are ported but have no eval coverage, because the packet fixes the patient's stage.
 
 ## Layout

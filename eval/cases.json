@@ -873,5 +873,258 @@
         "saturday|\\bsat\\b"
       ]
     }
+  },
+  {
+    "id": "h-somebody-real",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "escalation",
+      "human-request"
+    ],
+    "text": "Can somebody real take over this conversation please",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": true,
+      "reasonCode": "HUMAN_REQUESTED"
+    }
+  },
+  {
+    "id": "h-licensed-doctors",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "packages"
+    ],
+    "text": "Are the people doing the surgery licensed doctors?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false
+    }
+  },
+  {
+    "id": "h-refund-demand",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "escalation",
+      "money"
+    ],
+    "text": "Refund the 500 I paid yesterday.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": true,
+      "reasonCode": "MONEY_MOVE_OR_REFUND_ACTION"
+    }
+  },
+  {
+    "id": "h-refund-after-flights",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "deposit-terms"
+    ],
+    "text": "Is the deposit still refundable once my flights are booked?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "flight"
+      ],
+      "urls": []
+    }
+  },
+  {
+    "id": "h-pencil-in",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "escalation",
+      "dates"
+    ],
+    "text": "Tell Dr. Hakan's team to pencil me in for January 14.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": true,
+      "reasonCodeIn": [
+        "CLINIC_CONTACT_ACTION",
+        "DATE_HOLD_OR_AVAILABILITY_ACTION"
+      ]
+    }
+  },
+  {
+    "id": "h-quiet-month",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "dates"
+    ],
+    "text": "Which month is quietest at Heva?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "urls": []
+    }
+  },
+  {
+    "id": "h-take-from-amex",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "escalation",
+      "payment-action"
+    ],
+    "text": "Take $600 from my Amex ending 0005 for Gold.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": true,
+      "reasonCode": "PAYMENT_ACTION_NO_TOOL",
+      "mustNotMatch": [
+        "0005",
+        "600"
+      ]
+    }
+  },
+  {
+    "id": "h-amex-accepted",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "payment"
+    ],
+    "text": "Do you accept American Express?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false
+    }
+  },
+  {
+    "id": "h-doctor-call",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "boundary",
+      "escalation",
+      "call"
+    ],
+    "text": "I'd rather the doctor phone me than text. Can you set that up?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": true,
+      "reasonCodeIn": [
+        "CALL_REQUEST",
+        "HUMAN_REQUESTED"
+      ]
+    }
+  },
+  {
+    "id": "h-choose-sapphire",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "payment",
+      "link"
+    ],
+    "text": "I'll go with the Sapphire package.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "urls": [
+        "https://www.doctours.com/payment/55555555-5555-4555-8555-555555555551"
+      ]
+    }
+  },
+  {
+    "id": "h-silver-contents",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "pricing"
+    ],
+    "text": "What is included in Silver?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "hotel|night"
+      ],
+      "urls": []
+    }
+  },
+  {
+    "id": "h-cherry",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "financing"
+    ],
+    "text": "Does Cherry financing work with you guys?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "(don't|do not) accept Cherry",
+        "klarna|paypal|layaway"
+      ]
+    }
+  },
+  {
+    "id": "h-month-to-sort-finances",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "pause"
+    ],
+    "text": "Honestly I need a month to sort out my finances first.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "shouldFollowUp": true,
+      "mustMatch": [
+        "check in"
+      ],
+      "urls": []
+    }
+  },
+  {
+    "id": "h-assessment-link-again",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "assessment",
+      "link"
+    ],
+    "text": "Can I get the link to my assessment again?",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "urls": [
+        "https://www.doctours.com/assessment/c3d4e5f6-3333-4333-8333-333333333333"
+      ]
+    }
+  },
+  {
+    "id": "h-passport",
+    "source": "custom",
+    "split": "holdout",
+    "tags": [
+      "travel"
+    ],
+    "text": "Do I need a passport for Turkey? I don't have one.",
+    "note": "Holdout. Written after tuning and never run. Run once and report; do not tune on it.",
+    "expect": {
+      "escalate": false,
+      "mustMatch": [
+        "passport"
+      ]
+    }
   }
 ]

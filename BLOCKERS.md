@@ -15,7 +15,7 @@ Open since 2026-10-07.
 - Confirming the last batch of fixes with live calls. The last full eval run that completed is `eval-m7-2`: 47 of 50 cases passed, and escalation precision and recall were both 100%. The three failures each have a fix in commit `dd2eaae`. The fixes that are code have unit tests. The two that are prompt wording (the router setting instruction-like text aside, and the plain-sentences line in the responder's frame) are not yet confirmed live.
 - The stability run: `npm run eval -- --repeat 3`, which reports the flip rate for `escalate`.
 - The comparison of responder effort `low` against `medium`.
-- A fresh holdout set. I read the outputs of every current case while fixing bugs, so all fifty now count as dev cases. A real holdout has to be new cases that are run once.
+- The holdout run. I read the outputs of the first fifty cases while fixing bugs, so they all count as dev cases. I have since added fifteen holdout cases (ids starting `h-`) that have never been run. They should be run once and reported, not tuned on.
 - The full baseline run of the original prompt (M9). I am using the fallback you named instead: a static size comparison.
 
 **What I did instead.**
@@ -27,9 +27,10 @@ Open since 2026-10-07.
 
 ```
 npm run smoke
-npm run eval -- --run-id after-fixes
-npm run eval -- --repeat 3 --run-id stability
-RESPONDER_EFFORT=medium npm run eval -- --run-id effort-medium
+npm run eval -- --split dev --run-id after-fixes
+npm run eval -- --split dev --repeat 3 --run-id stability
+RESPONDER_EFFORT=medium npm run eval -- --split dev --run-id effort-medium
+npm run eval -- --split holdout --run-id holdout
 npm run report -- traces/after-fixes traces/eval-m7-2
 ```
 
