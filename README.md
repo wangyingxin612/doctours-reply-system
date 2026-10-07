@@ -293,7 +293,7 @@ State on 2026-10-07. Every number below is from a run whose traces are in `trace
 - **Stability.** Each dev case was run three times. `escalate` flipped on 0 of 50 cases. As scored that day, no case passed on some runs and failed on others. Under the machinery check, one does: the same price question fails one run of three. This run has not been repeated on the final code.
 - **Holdout, 15 cases.** Written after tuning and run once: 15 of 15 as scored that day, with all five escalations right.
 - **The holdout is no longer fully blind.** After its one run I read its replies. The reply to "What is included in Silver?" said "The tool shows 3 hotel nights included." No check covered that, so it passed. Two things came from reading it: one pattern in the internal-vocabulary validator, and an eval check for machinery talk that now applies to every case. Scored again with that check, the same run is 14 of 15. Any later run of these cases is a regression check, not a blind test.
-- **Two dev cases added on review**, one that names two clinics and one that names one and points at the other. Both passed on their one run. In both the router found both clinics, so code fetched both. The path where the model fetches the second clinic itself is covered by a unit test.
+- **Two dev cases added on review**, one that names two clinics and one that names one and points at the other. Both passed on their one run. In both the router found both clinics, so code fetched both. The path where the model fetches a second clinic itself is covered by a unit test, and it happened once live: in the holdout run, on a question that named no clinic, the model fetched the doctors of both clinics itself.
 - **Original prompt, same 50 dev cases.** 29 of the 36 cases that need an answer, and 2 of the 14 that need a person. See "Cost and speed".
 - **Effort.** Medium passed the same 50 cases as low, at the same latency.
 
@@ -306,6 +306,7 @@ What the live runs found, and what changed:
 | A holdout reply said "The tool shows" | The internal-vocabulary validator blocks it, and the eval fails any reply that talks about the machinery. |
 | A few router calls took 15 to 36 seconds, with no record of why | Each model call now records the attempts that failed and were retried. |
 | My check for one case demanded the word "insurance" and failed a correct reply | The check now tests the fact. `--recheck` re-scored every stored run. |
+| In a fresh clone, `npm test` failed after the README's command had written `replies.json`: the leak test read that file as source | The leak test reads only files that are in the repository or could be added to it. |
 
 What is not verified:
 
