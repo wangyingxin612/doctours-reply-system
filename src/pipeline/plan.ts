@@ -75,6 +75,8 @@ const SELF_SERVE_SKILL: Record<SelfServeStep, string> = {
   book_consultation: "consultation",
 };
 
+const PAUSE_SKILL = "pause-followup";
+
 const CONSULTATION_URL = "https://www.doctours.com/consultation";
 
 const GENERIC_NAME_WORDS = new Set(["clinic", "the", "hair", "center", "centre", "hospital", "medical", "transplant"]);
@@ -218,6 +220,7 @@ export function buildPlan(input: PlanInput): Plan {
     const owner = SELF_SERVE_SKILL[step];
     if (skills.has(owner)) selectedNames.add(owner);
   }
+  if (router.requestType === "pause" && skills.has(PAUSE_SKILL)) selectedNames.add(PAUSE_SKILL);
   const selected = [...selectedNames].sort().map((name) => skills.get(name));
   const stage = skills.stage(context.pipelineStatus);
   const loaded = [skills.core, ...(stage ? [stage] : []), ...selected];

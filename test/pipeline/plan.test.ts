@@ -89,6 +89,11 @@ describe("planner: skills and prefetch", () => {
     expect(ledger.calls).toEqual([]);
   });
 
+  it("loads the pause rules for a pause even when the router did not list them", () => {
+    const { plan: built } = plan(routed({ requestType: "pause", primaryIntent: "pause_followup" }), "let me think about it");
+    expect(built.selected.map((skill) => skill.name)).toEqual(["pause-followup"]);
+  });
+
   it("ignores skill names it does not have", () => {
     const { plan: built } = plan(routed({ skills: ["consultation", "no-such-skill" as never] }));
     expect(built.selected.map((skill) => skill.name)).toEqual(["consultation"]);
