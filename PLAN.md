@@ -1,6 +1,6 @@
 # Plan: Doctours reply system
 
-Status: approved on 2026-10-06. Work happens on the `build` branch.
+Status: approved on 2026-10-06. Built on the `build` branch. Section 10 has the state of each milestone. `BLOCKERS.md` has what is waiting on the owner.
 
 I read `docs/packet.md` and `docs/design-brief.md` in full, including the whole original system prompt. The packet wins on hard requirements. Sections 6 and 7 record each review decision next to the reasoning. Section 9 lists what the review added.
 
@@ -382,3 +382,33 @@ All accepted in review.
 4. **Flip rate.** `npm run eval -- --repeat 3` runs each case three times and reports how often `escalate` flips. It shows how much of a Monday swing is noise.
 5. **The brief is corrected.** `docs/design-brief.md` matches these decisions, and the two copied reply templates are gone from it.
 6. **Cut line.** If time runs short: M10 first, then the full baseline run (the token count stays), then the refusal fallback flag. M8 stays.
+
+## 10. Status on 2026-10-07
+
+| Milestone | State |
+| --- | --- |
+| M0 Scaffold and SDK check | Done. The smoke check passed on both models. |
+| M1 Contract and data | Done. |
+| M2 Deterministic control plane | Done. |
+| M3 Vertical slice | Done. The five packet messages pass. |
+| M4 Remaining skills | Done. 26 skills, every one built by `scripts/split-prompt.ts`. |
+| M5 Full router and planner | Done. |
+| M6 Remaining validators and failure handling | Done. Eleven validators. |
+| M7 Eval and tuning | Partly done, then blocked. 50 cases and `--repeat` exist. The last complete run passed 47 of 50 with escalation exactly right on all 50. The fixes for the other three are in the code and are not yet re-run. The flip-rate run, the effort comparison and a holdout run are blocked. |
+| M8 Monday report | Done, and run on real traces. |
+| M9 README and wrap-up | README done. The baseline is the static size comparison (`npm run size`), the fallback named in 7.3. The full baseline run is blocked. |
+| M10 Unreachable stages | Done. No eval coverage, as planned. |
+
+The blocker is one thing: the API account ran out of credit during the third full eval run. `BLOCKERS.md` lists what to run once it has credit.
+
+What the build changed from this plan, beyond what earlier sections already record:
+
+- Skills are generated, not hand-edited. That made "original wording only" a tested property instead of a promise.
+- The always-loaded part is larger than planned: about 25,000 characters, of which `core` is 15,000. The plan said 3,000 tokens for `core`. Real token counts also run higher than characters ÷ 4.
+- The consultation link is decided by code from the primary intent, after the router missed the self-serve flag on the first live run.
+- A reply carries one self-serve link, for the step the message is mainly about.
+- `prefetchNamed` was added to frontmatter, so a skill that only needs clinic data for a named clinic does not fetch it for every recommended clinic.
+- A validator blocks a reply that announces a price cannot be matched. The original prompt bans that sentence, and the model kept writing it.
+- An out-of-credit API account is a fatal error. Before the fix it produced a run of 50 escalations.
+- Asked directly whether it is a bot, the model says it is an AI. I left that as it is. The validator only blocks a claim to be human.
+- All 50 eval cases are dev cases. A real holdout has to be written after tuning and run once.
